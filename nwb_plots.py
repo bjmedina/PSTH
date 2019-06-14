@@ -46,12 +46,6 @@ for probe_name in names:
     # Get all cells that are in V for every probe
     probes[probe_name] = Probe(nwb, probe_name)
 
-## Calculating number of bins needed based on the predefined bin width
-start    = 0 #in seconds
-end      = 3*60*60 #in seconds
-
-
-# We want a table for each probe
-
-# tables = makeProbeTable(probes, start, end, BIN_WIDTH, DIFF_COMBS)
+        
+# FILL TABLE
 
