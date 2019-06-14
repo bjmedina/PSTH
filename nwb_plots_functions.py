@@ -20,39 +20,27 @@ class Probe:
     # Dictionary of cell objects
     cells = {}
 
-    
-class Cell:
-    table = {}
-
-
-            
-
-def getProbeCells(nwb, probes):
-    '''
-    Description
-    -----------
-    'GetProbeCells' gets dataset and returns all cells, for each probe, that are in the Visual Cortex.
-
-    Input(s)
-    --------
-    'nwb': h5py._hl.files.File. 'spikes.nwb' dataset. 
-    
-    
-    Output(s)
-    ---------
-    'probe_cells': dict. Dictionary that contains probe cell name as key and all cells that are in V.
-    '''
-    
-    # Keep a dictionary of all cells in V in each probe
-    probe_cells = {}
-
-    # Get all probe names
- 
-    
-    # For every probe, let's find out which cells in that probe are in the VC
-    for probe in probes:
+    def __init__(self, nwb, name):
         
-    # Get all cells with activity in V
+        self.cells = getProbeCells(nwb, name)
+    
+    def getProbeCells(nwb, probe):
+        '''
+        Description
+        -----------
+        'GetProbeCells' gets dataset and returns all cells, for a given probe, that are in the Visual Cortex.
+        
+        Input(s)
+        --------
+        'nwb': h5py._hl.files.File. 'spikes.nwb' dataset. 
+        'probe': string. name of probe.
+            
+        Output(s)
+        ---------
+        'v_cells': dict. Dictionary that all cells that are in V.
+        '''
+
+        # Get all cells with activity in V
         cells   = nwb['processing'][probe]['unit_list'].value
         v_cells = {} 
         
@@ -62,13 +50,18 @@ def getProbeCells(nwb, probes):
             if region[0] == 'V' or region[0] == 'v':
                 v_cells[cell] = Cell()
                 
-        probe_cells[probe] = v_cells
+        return v_cells
+        
+
+    def getCell(cell):
+        return cells[cell]
     
+class Cell:
+    
+    table = {}
 
-    return probe_cells
 
-
-## --- EH --- #
+## --- EH --- ## will probably need this for every cell
 def makeTable(start, end, bin_width, num_combs):
     '''
     Description

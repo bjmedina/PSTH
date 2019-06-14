@@ -29,16 +29,22 @@ DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 MOUSE_ID = '424448'
 
 # Number of different stimulus combinations possible
-# {1, 2, 4, 8, 15} X {0, 45, 90, 135, 180, 225, 270, 315} + 1 kind of grey image
+# {1, 2, 4, 8, 15} X {0, 45, 90, 135, 180, 225, 270, 315} X 15 + 1 kind of grey image (30 of them)
 DIFF_COMBS = 41
 
 # Get file from directory
 spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
-nwb    = h5.File(spikes_nwb_file)
-probes = nwb['processing'].keys()
+nwb = h5.File(spikes_nwb_file)
 
-# Get all cells that are in V for every probe
-probe_cells = getProbeCells(nwb, probes)
+# names of probes
+names = nwb['processing'].keys()
+
+# dictionary of probes
+probes = {}
+
+for probe_name in names:
+    # Get all cells that are in V for every probe
+    probes[probe_name] = Probe(nwb, probe_name)
 
 ## Calculating number of bins needed based on the predefined bin width
 start    = 0 #in seconds
@@ -47,12 +53,5 @@ end      = 3*60*60 #in seconds
 
 # We want a table for each probe
 
-tables = makeProbeTable(probes, start, end, BIN_WIDTH, DIFF_COMBS)
+# tables = makeProbeTable(probes, start, end, BIN_WIDTH, DIFF_COMBS)
 
-
-### FILLING TABLE
-
-'''
-Ideas
-----
-1. Maybe it'll be better to make objects for probes and cells
