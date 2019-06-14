@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jun 12 09:25:21 EDT 2019
+
+@author: Bryan Medina 
+
+"""
+
+###### Imports ########
+from scipy.ndimage.filters import gaussian_filter1d
+
+import h5py as h5
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+########################
