@@ -17,23 +17,82 @@ import os
 
 class Probe:
 
-    # Dictionary of cell objects
-    cells = {}
-
     def __init__(self, nwb, name):
+        '''
+        Description
+        -----------
+        Constructor
         
-        self.cells = getProbeCells(nwb, name)
+        Input(s)
+        --------
+        'nwb': h5py._hl.files.File. 'spikes.nwb' dataset. 
+        'probe': string. name of probe.
         
-    def getCell(self, cell):
-        return self.cells[cell]
+        Output(s)
+        ---------
+        New 'Probe' object
+        '''
+        
+        self.__cells = getProbeCells(nwb, name)
+        
+    def getCell(self, cell_number):
+        '''
+        Description
+        -----------
+        Method returns dictionary of cell "at index 'cell_number'"
+        
+        Input(s)
+        --------
+        'cell_number': int. key of a corresponding cells
+        
+        Output(s)
+        ---------
+        Dictionary of cell 'cell_number'
+        '''
+        
+        return self.__cells[cell_number]
+
+    def getCellList(self):
+        '''
+        Description
+        -----------
+        Method returns dictionary of cell "at index 'cell_number'"
+        
+        Input(s)
+        --------
+        'cell_number': int. key of a corresponding cells
+        
+        Output(s)
+        ---------
+        Dictionary of cell 'cell_number'
+        '''
+
+        return self.__cells.keys()
 
 
 class Cell:
     
-    table = {}
+    def __init__(self, start, end, bin_width, nwb, probe):
+        '''
+        Description
+        -----------
+        Constructor
+        
+        Input(s)
+        --------
+        'start'    : integer. start time of experiment in seconds
+        'end'      : integer. end time of experiment in seconds
+        'bin_width': integer. width of each time bin in seconds (should this all be in seconds?)
+        'num_combs': integer. number of different combinations the stimuli can take on.
+    
+        
+        Output(s)
+        ---------
+        New 'Cell' object
+        '''
+        self.__table = makeTable(start, end, bin_width, nwb, probe)
+        
 
-    def __init__(self, start, end, bin_width, num_combs):
-        self.table = makeTable(start, end, bin_width, num_combs)
 
     
 def getProbeCells(nwb, probe):
@@ -56,23 +115,24 @@ def getProbeCells(nwb, probe):
     cells   = nwb['processing'][probe]['unit_list'].value
     v_cells = {} 
 
-    
     ## Calculating number of bins needed based on the predefined bin width
+    ########
+    ##### Is this variable??????
+    #######
     start     = 0 #in seconds
     end       = 3*60*60 #in seconds
     bin_width = 100
-    num_combs = 41
     
     for cell in cells:
         region = nwb['processing'][probe]['UnitTimes'][str(cell)]['ccf_structure'].value.decode('utf-8')
         
         if region[0] == 'V' or region[0] == 'v':
-            v_cells[cell] = Cell(start, end, bin_width, num_combs)
+            v_cells[cell] = Cell(start, end, bin_width, nwb, probe)
             
     return v_cells
 
-## --- EH --- ## will probably need this for every cell
-def makeTable(start, end, bin_width, num_combs):
+
+def makeTable(start, end, bin_width, nwb, probe):
     '''
     Description
     -----------
@@ -83,26 +143,26 @@ def makeTable(start, end, bin_width, num_combs):
     'start'    : integer. start time of experiment in seconds
     'end'      : integer. end time of experiment in seconds
     'bin_width': integer. width of each time bin in seconds (should this all be in seconds?)
-    'num_combs': integer. number of different combinations the stimuli can take on.
-    
+    'nwb': h5py._hl.files.File. 'spikes.nwb' dataset. 
+    'probe': string. name of probe.
     
     Output(s)
     ---------
     'table': dict. Dictionary that contains orientation combination as key and all cells that are in V.
     '''
+    num_combs = 41
 
     # Get number of bins based on bin width, and start/end time of experiment
     num_bins = int((end-start)/bin_width+1)
 
     # Corresponds to times of experiment
     bins     = np.linspace(start, end, num_bins, dtype=int)
-
-    
+  
     # All possible temporal frequencies for the stimulus
     temp_freqs   = [1, 2, 4, 8, 15]
     
     # All possible orientations of stimulus (angles)
-    orientations = [0, 45, 45*2, 135, 180, 225, 270, 315]
+    orientations = [i*45 for i in range(8)]
     
     # In this table, each key is a different configuration of the stimulus
     # and each row corresponds to spikes in a time bin.

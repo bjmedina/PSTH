@@ -34,7 +34,7 @@ DIFF_COMBS = 41
 
 # Get file from directory
 spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
-nwb = h5.File(spikes_nwb_file)
+nwb = h5.File(spikes_nwb_file, 'r')
 
 # names of probes
 names = nwb['processing'].keys()
@@ -46,6 +46,11 @@ for probe_name in names:
     # Get all cells that are in V for every probe
     probes[probe_name] = Probe(nwb, probe_name)
 
-        
-# FILL TABLE
 
+### things you can use
+
+# gets spiking times for cell 43 in probeA ( loop throught probes and cell numbers )
+spikes = nwb['processing']['probeA']['UnitTimes']['43']['times'].value
+
+# time stamps ( this never changes )
+timestamps = nwb['stimulus']['presentation']['drifting_gratings_2']['timestamps'].value
