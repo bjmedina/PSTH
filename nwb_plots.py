@@ -47,12 +47,35 @@ for probe_name in names:
     probes[probe_name] = Probe(nwb, probe_name)
 
 
-### things you can use
-
+### For testing
 # gets spiking times for cell 43 in probeA ( loop throught probes and cell numbers )
 spikes = nwb['processing']['probeA']['UnitTimes']['43']['times'].value
 
 # time stamps ( this never changes )
+# This is SPECIFICALLY for the 'drifting_gratings_2' stimulus
 timestamps = nwb['stimulus']['presentation']['drifting_gratings_2']['timestamps'].value
 
 
+'''
+TODO: (filling time bins)
+
+For each probe:
+
+    For each cell:  
+  
+        For each time stamp:
+
+            - get the orientation (that'll be your first index)
+            - get the list of all ~indices of~ spikes that belong to that orientation (binarySearch gives you this)
+                  - maybe I should just return a lit of all the spike times... and not the indices............
+            - figure out way to calculate timebin to put each spike in (timebin itself is the next index)
+                  - easy to do BUT, why do this is linear time, when you could do it in sub-linear??? 
+                  - let's try to find THAT solution to the problem 
+            - Add 1 to that time bin
+            - move on
+'''
+
+
+'''
+TODO: (plotting)
+'''

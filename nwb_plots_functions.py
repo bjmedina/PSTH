@@ -92,8 +92,6 @@ class Cell:
         '''
         self.__table = makeTable(start, end, bin_width, nwb, probe)
         
-
-
     
 def getProbeCells(nwb, probe):
     '''
@@ -178,11 +176,10 @@ def makeTable(start, end, bin_width, nwb, probe):
             table[config][:, 0] = bins
 
     # Empty images
-    table['NaN'] = np.zeros((num_bins, 2))
-    table['NaN'][:, 0] = bins
-    
+    table['NaN_NaN'] = np.zeros((num_bins, 2))
+    table['NaN_NaN'][:, 0] = bins
+     
     return table
-
 
 
 def makeProbeTable(probes, start, end, bin_width, num_combs):
@@ -213,11 +210,12 @@ def makeProbeTable(probes, start, end, bin_width, num_combs):
 
     return tables
 
+
 def binarySearch(spikes, interval, start, end):
     '''
     Description
     -----------
-    'binarySearch' will find the spikes in a certain interval. Once it finds the index of a spike in the interval, it will try to find all the spikes that are in that interval.
+    'binarySearch' will find the index of a spike in a certain interval. Once it finds the index of a spike in the interval, it will try to find all the spikes that are in that interval. Essentially a modified take on the classic binary search algorithm.
     
     Input(s)
     --------
@@ -226,27 +224,127 @@ def binarySearch(spikes, interval, start, end):
 
     Output(s)
     ---------
-    
+    list. Returns list of spikes in a given interval (first spike is found using binary search, the rest with the 'spikesInInterval' method.    
     '''
     
     if end >= 1:
+    
+        mid_point = midpoint(start, end)
         
-        mid_point = int(start + (end - start) / 2)
-        print(mid_point)
-        
-        print(str(type(mid_point)))
-
         # If our spike is inside the interval, let's return the index
-        if spikes[mid_point] >= interval[0] and spikes[mid_point] <= interval[1]:
-            return mid_point
+        if inside(spikes[mid_point], interval):
+            return spikesInInterval(spikes, interval, mid_point)
 
         # If our spike is greater than (or less than) the interval, let's adjust checking bounds
         elif spikes[mid_point] > interval[1]:
+
+            next_midpoint = midpoint(start, mid_point-1)
+
+            # If this is true, then we're going to hit a recursion error....
+            # We don't want this.
+            if mid_point == next_midpoint:
+                return -1
+            
             return binarySearch(spikes, interval, start, mid_point - 1)
 
         elif spikes[mid_point] < interval[0]:
+            
+            next_midpoint = midpoint(mid_point+1, end)
+            
+            # If this is true, then we're going to hit a recursion error....
+            # We don't want this.            
+            if mid_point == next_midpoint:
+                return -1
+            
             return binarySearch(spikes, interval, mid_point + 1, end)
 
     else:
 
         return -1
+
+def spikesInInterval(spikes, interval, known):
+    '''
+    Description
+    -----------
+    'spikesInInterval' will find all spikes in a certain interval based on the index of one found in the interval.    
+    Input(s)
+    --------
+    'spikes'  : list. list of all spikes of a given neuron.
+    'interval': list. current time interval of stimulus (usually about 2 seconds).
+    'known'   : int. Index in 'spikes' of a known spike in the interval.
+
+    Output(s)
+    ---------
+    'spike_set': set. indices of all spikes in the interval. This is converted to a list when returned.
+    '''
+
+    # Index of known spike
+    i         = known
+
+    # Boolean variables we'll be using to determine if we're either checking 'above' or 'below' the known value.
+    # 'DOWN' is true because we'll start by checking below the known spike
+    DOWN      = True
+    UP        = False
+
+    # Set of spikes. We'll be using a set because 1) sets can't have duplicates and 2) checking for duplicates can be done in constant O(1) time. 
+    spike_set = set()
+
+    
+    # We don't want to check out of bounds of the spikes list.
+    while i > -1 or i < len(spikes):
+
+        if inside(spikes[i], interval) and DOWN:
+            spike_set.add(i)
+            i = i - 1
+            
+        elif not inside(spikes[i], interval) and DOWN:
+            i    = known + 1
+            UP   = True
+            DOWN = False
+            
+        elif inside(spikes[i], interval) and UP:
+            spike_set.add(i)
+            i = i + 1
+            
+        elif not inside(spikes[i], interval) and UP:
+            break
+
+    # Convert set to list, then return.
+    return list(spike_set)
+    
+
+def inside(spike, interval):
+    '''
+    Description
+    -----------
+    'inside' will determine if a spike is in an interval.
+ 
+    Input(s)
+    --------
+    'spikes'  : list. list of all spikes of a given neuron.
+    'interval': list. current time interval of stimulus (usually about 2 seconds).
+
+    Output(s)
+    --------
+    boolean. True if spike is in interval. False otherwise.
+    '''
+    
+    return spike >= interval[0] and spike <= interval[1]
+
+
+def midpoint(start, end):
+    '''
+    Description
+    -----------
+    'midpoint' will calculate midpoint between two points
+ 
+    Input(s)
+    --------
+    'start'  : int. beginning
+    'end'    : int. end
+
+    Output(s)
+    --------
+    int. midpoint between 'start' and 'end'
+    '''
+    return int(start + (end - start)/2)
