@@ -54,3 +54,5 @@ spikes = nwb['processing']['probeA']['UnitTimes']['43']['times'].value
 
 # time stamps ( this never changes )
 timestamps = nwb['stimulus']['presentation']['drifting_gratings_2']['timestamps'].value
+
+

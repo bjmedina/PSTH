@@ -212,3 +212,41 @@ def makeProbeTable(probes, start, end, bin_width, num_combs):
         tables[probe] = makeTable(start, end, bin_width, num_combs)
 
     return tables
+
+def binarySearch(spikes, interval, start, end):
+    '''
+    Description
+    -----------
+    'binarySearch' will find the spikes in a certain interval. Once it finds the index of a spike in the interval, it will try to find all the spikes that are in that interval.
+    
+    Input(s)
+    --------
+    'spikes'  : list. list of all spikes of a given neuron.
+    'interval': list. current time interval of stimulus (usually about 2 seconds).
+
+    Output(s)
+    ---------
+    
+    '''
+    
+    if end >= 1:
+        
+        mid_point = int(start + (end - start) / 2)
+        print(mid_point)
+        
+        print(str(type(mid_point)))
+
+        # If our spike is inside the interval, let's return the index
+        if spikes[mid_point] >= interval[0] and spikes[mid_point] <= interval[1]:
+            return mid_point
+
+        # If our spike is greater than (or less than) the interval, let's adjust checking bounds
+        elif spikes[mid_point] > interval[1]:
+            return binarySearch(spikes, interval, start, mid_point - 1)
+
+        elif spikes[mid_point] < interval[0]:
+            return binarySearch(spikes, interval, mid_point + 1, end)
+
+    else:
+
+        return -1
