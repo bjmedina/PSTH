@@ -17,7 +17,7 @@ import os
 
 class Probe:
 
-    def __init__(self, nwb, name):
+    def __init__(self, nwb, name, width, start, end):
         '''
         Description
         -----------
@@ -33,7 +33,7 @@ class Probe:
         New 'Probe' object
         '''
         
-        self.__cells = getProbeCells(nwb, name)
+        self.__cells = getProbeCells(nwb, name, width, start, end)
         
     def getCell(self, cell_number):
         '''
@@ -91,9 +91,30 @@ class Cell:
         New 'Cell' object
         '''
         self.__table = makeTable(start, end, bin_width, nwb, probe)
+
+    def getTable(self, orientation):
+        '''
+        Description
+        -----------
+        Method returns table for given cell
         
+        Input(s)
+        --------
+        'orientation': string. key of dictionary.
+        
+        Output(s)
+        ---------
+        table at certain orientation
+        '''
+        return self.__table[orientation]
+
+    def addSpike(self, orientation, timebin):
+        # I think this is how it works... But it's the idea 
+        self.__table[orientation][timebin] = self.__table[orientation][timebin] + 1
+
+    ### Add function for filling table
     
-def getProbeCells(nwb, probe):
+def getProbeCells(nwb, probe, bin_width, start, end):
     '''
     Description
     -----------
@@ -117,9 +138,7 @@ def getProbeCells(nwb, probe):
     ########
     ##### Is this variable??????
     #######
-    start     = 0 #in seconds
-    end       = 3*60*60 #in seconds
-    bin_width = 100
+ 
     
     for cell in cells:
         region = nwb['processing'][probe]['UnitTimes'][str(cell)]['ccf_structure'].value.decode('utf-8')
@@ -134,7 +153,7 @@ def makeTable(start, end, bin_width, nwb, probe):
     '''
     Description
     -----------
-    'makeTable' creates a dictionary to keep track of time bins for each possible orientation of stimulus.
+    'makeTable' creates a dictionary to keep track of time bins for each possible orientation of stimulus. One for each cell.
 
     Input(s)
     --------
@@ -148,7 +167,6 @@ def makeTable(start, end, bin_width, nwb, probe):
     ---------
     'table': dict. Dictionary that contains orientation combination as key and all cells that are in V.
     '''
-    num_combs = 41
 
     # Get number of bins based on bin width, and start/end time of experiment
     num_bins = int((end-start)/bin_width+1)
@@ -176,8 +194,8 @@ def makeTable(start, end, bin_width, nwb, probe):
             table[config][:, 0] = bins
 
     # Empty images
-    table['NaN_NaN'] = np.zeros((num_bins, 2))
-    table['NaN_NaN'][:, 0] = bins
+    table['nan_nan'] = np.zeros((num_bins, 2))
+    table['nan_nan'][:, 0] = bins
      
     return table
 
@@ -294,7 +312,7 @@ def spikesInInterval(spikes, interval, known):
     while i > -1 or i < len(spikes):
 
         if inside(spikes[i], interval) and DOWN:
-            spike_set.add(i)
+            spike_set.add(spikes[i])
             i = i - 1
             
         elif not inside(spikes[i], interval) and DOWN:
@@ -303,7 +321,7 @@ def spikesInInterval(spikes, interval, known):
             DOWN = False
             
         elif inside(spikes[i], interval) and UP:
-            spike_set.add(i)
+            spike_set.add(spikes[i])
             i = i + 1
             
         elif not inside(spikes[i], interval) and UP:
@@ -347,4 +365,16 @@ def midpoint(start, end):
     --------
     int. midpoint between 'start' and 'end'
     '''
+    
     return int(start + (end - start)/2)
+
+def insertToBin(spiketime, bin_width):
+    
+    ## TODO
+    # I think best thing to do is to wrong 3 down to next multiple of timebins
+    # PROBABLY have to subtract "start"
+    # This doesn't support spikes that are not in the range.....
+    
+    idx = int( (spiketime - (spiketime % bin_width)) / bin_width) 
+    
+    return idx 
