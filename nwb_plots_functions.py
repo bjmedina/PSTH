@@ -4,7 +4,6 @@
 Created on Wed Jun 12 09:25:21 EDT 2019
 
 @author: Bryan Medina 
-
 """
 ###### Imports ########
 from scipy.ndimage.filters import gaussian_filter1d
@@ -17,7 +16,7 @@ import os
 
 class Probe:
 
-    def __init__(self, nwb, name, width, start, end):
+    def __init__(self, nwb, name):
         '''
         Description
         -----------
@@ -33,7 +32,7 @@ class Probe:
         New 'Probe' object
         '''
         
-        self.__cells = getProbeCells(nwb, name, width, start, end)
+        self.__cells = getProbeCells(nwb, name)
         
     def getCell(self, cell_number):
         '''
@@ -56,11 +55,7 @@ class Probe:
         '''
         Description
         -----------
-        Method returns dictionary of cell "at index 'cell_number'"
-        
-        Input(s)
-        --------
-        'cell_number': int. key of a corresponding cells
+        Method returns dictionary of cells
         
         Output(s)
         ---------
@@ -72,27 +67,19 @@ class Probe:
 
 class Cell:
     
-    def __init__(self, start, end, bin_width, nwb, probe):
+    def __init__(self):
         '''
         Description
         -----------
         Constructor
         
-        Input(s)
-        --------
-        'start'    : integer. start time of experiment in seconds
-        'end'      : integer. end time of experiment in seconds
-        'bin_width': integer. width of each time bin in seconds (should this all be in seconds?)
-        'num_combs': integer. number of different combinations the stimuli can take on.
-    
-        
         Output(s)
         ---------
         New 'Cell' object
         '''
-        self.__table = makeTable(start, end, bin_width, nwb, probe)
+        self.__table    = makeTable()
 
-    def getTable(self, orientation):
+    def getSpikes(self, orientation):
         '''
         Description
         -----------
@@ -108,13 +95,15 @@ class Cell:
         '''
         return self.__table[orientation]
 
-    def addSpike(self, orientation, timebin):
+    def addSpike(self, orientation, spike):
         # I think this is how it works... But it's the idea 
-        self.__table[orientation][timebin] = self.__table[orientation][timebin] + 1
+        self.__table[orientation].append(spike)
+
+        
 
     ### Add function for filling table
     
-def getProbeCells(nwb, probe, bin_width, start, end):
+def getProbeCells(nwb, probe):
     '''
     Description
     -----------
@@ -133,47 +122,27 @@ def getProbeCells(nwb, probe, bin_width, start, end):
     # Get all cells with activity in V
     cells   = nwb['processing'][probe]['unit_list'].value
     v_cells = {} 
-
-    ## Calculating number of bins needed based on the predefined bin width
-    ########
-    ##### Is this variable??????
-    #######
- 
     
     for cell in cells:
         region = nwb['processing'][probe]['UnitTimes'][str(cell)]['ccf_structure'].value.decode('utf-8')
         
         if region[0] == 'V' or region[0] == 'v':
-            v_cells[cell] = Cell(start, end, bin_width, nwb, probe)
+            v_cells[cell] = Cell()
             
     return v_cells
 
 
-def makeTable(start, end, bin_width, nwb, probe):
+def makeTable():
     '''
     Description
     -----------
     'makeTable' creates a dictionary to keep track of time bins for each possible orientation of stimulus. One for each cell.
-
-    Input(s)
-    --------
-    'start'    : integer. start time of experiment in seconds
-    'end'      : integer. end time of experiment in seconds
-    'bin_width': integer. width of each time bin in seconds (should this all be in seconds?)
-    'nwb': h5py._hl.files.File. 'spikes.nwb' dataset. 
-    'probe': string. name of probe.
     
     Output(s)
     ---------
     'table': dict. Dictionary that contains orientation combination as key and all cells that are in V.
     '''
-
-    # Get number of bins based on bin width, and start/end time of experiment
-    num_bins = int((end-start)/bin_width+1)
-
-    # Corresponds to times of experiment
-    bins     = np.linspace(start, end, num_bins, dtype=int)
-  
+    
     # All possible temporal frequencies for the stimulus
     temp_freqs   = [1, 2, 4, 8, 15]
     
@@ -189,45 +158,12 @@ def makeTable(start, end, bin_width, nwb, probe):
         for angle in orientations:
 
             config        = str(freq) + "_" + str(angle)
-            table[config] = np.zeros((num_bins, 2))
+            table[config] = []
             
-            table[config][:, 0] = bins
-
     # Empty images
-    table['nan_nan'] = np.zeros((num_bins, 2))
-    table['nan_nan'][:, 0] = bins
+    table['nan_nan'] = []
      
     return table
-
-
-def makeProbeTable(probes, start, end, bin_width, num_combs):
-    '''
-    Description
-    -----------
-    'makeProbeTable' creates a dictionary for each probe to keep track of time bins for each possible orientation of stimulus.
-
-    Input(s)
-    --------
-    'Probe'    : list. list of names of all probes
-    'start'    : integer. start time of experiment in seconds
-    'end'      : integer. end time of experiment in seconds
-    'bin_width': integer. width of each time bin in seconds (should this all be in seconds?)
-    'num_combs': integer. number of different combinations the stimuli can take on.
-    
-    
-    Output(s)
-    ---------
-    'tables': dict. Dictionary that contains probe cell name as key.
-    '''
-    
-    tables = {}
-    
-    for probe in probes:
-        
-        tables[probe] = makeTable(start, end, bin_width, num_combs)
-
-    return tables
-
 
 def binarySearch(spikes, interval, start, end):
     '''
@@ -263,7 +199,7 @@ def binarySearch(spikes, interval, start, end):
             if mid_point == next_midpoint:
                 return -1
             
-            return binarySearch(spikes, interval, start, mid_point - 1)
+            return binarySearch(spikes, interval, start, mid_point-1)
 
         elif spikes[mid_point] < interval[0]:
             
@@ -274,11 +210,12 @@ def binarySearch(spikes, interval, start, end):
             if mid_point == next_midpoint:
                 return -1
             
-            return binarySearch(spikes, interval, mid_point + 1, end)
+            return binarySearch(spikes, interval, mid_point+1, end)
 
     else:
 
         return -1
+
 
 def spikesInInterval(spikes, interval, known):
     '''
@@ -368,13 +305,5 @@ def midpoint(start, end):
     
     return int(start + (end - start)/2)
 
-def insertToBin(spiketime, bin_width):
-    
-    ## TODO
-    # I think best thing to do is to wrong 3 down to next multiple of timebins
-    # PROBABLY have to subtract "start"
-    # This doesn't support spikes that are not in the range.....
-    
-    idx = int( (spiketime - (spiketime % bin_width)) / bin_width) 
-    
-    return idx 
+
+                           
