@@ -12,7 +12,28 @@ import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pickle
 ########################
+
+width = 1
+
+### This is for the 'drifting gratings' stimulus
+# All possible temporal frequencies for the stimulus
+temp_freqs   = [1, 2, 4, 8, 15]
+
+# All possible orientations of stimulus (angles)
+orientations = [i*45 for i in range(8)]
+    
+start   = 0
+end     = 2000
+mapping = {'probeA': 'AM',
+        'probeB': 'PM',
+        'probeC': 'V1',
+        'probeD': 'LM',
+        'probeE': 'AL',
+        'probeF': 'RL'}
+
+###
 
 class Probe:
 
@@ -33,6 +54,7 @@ class Probe:
         '''
         
         self.__cells = getProbeCells(nwb, name)
+        self.name    = mapping[name]
         
     def getCell(self, cell_number):
         '''
@@ -64,45 +86,6 @@ class Probe:
 
         return self.__cells.keys()
 
-
-class Cell:
-    
-    def __init__(self):
-        '''
-        Description
-        -----------
-        Constructor
-        
-        Output(s)
-        ---------
-        New 'Cell' object
-        '''
-        self.__table    = makeTable()
-
-    def getSpikes(self, orientation):
-        '''
-        Description
-        -----------
-        Method returns table for given cell
-        
-        Input(s)
-        --------
-        'orientation': string. key of dictionary.
-        
-        Output(s)
-        ---------
-        table at certain orientation
-        '''
-        return self.__table[orientation]
-
-    def addSpike(self, orientation, spike):
-        # I think this is how it works... But it's the idea 
-        self.__table[orientation].append(spike)
-
-        
-
-    ### Add function for filling table
-    
 def getProbeCells(nwb, probe):
     '''
     Description
@@ -132,6 +115,47 @@ def getProbeCells(nwb, probe):
     return v_cells
 
 
+class Cell:
+    
+    def __init__(self):
+        '''
+        Description
+        -----------
+        Constructor
+        
+        Output(s)
+        ---------
+        New 'Cell' object
+        '''
+        self.__table    = makeTable()
+
+    def getSpikes(self, config):
+        '''
+        Description
+        -----------
+        Method returns table for given cell
+        
+        Input(s)
+        --------
+        'config': string. key of dictionary.
+        
+        Output(s)
+        ---------
+        table at certain config
+        '''
+        return self.__table[config]
+
+    def addSpike(self, config, spike, end):
+        # I think this is how it works... But it's the idea
+        # Has to be a little more complicated than this
+        # You need to put it in the right bin
+
+        bn = insertToBin(spike, end)
+        #print("config: " + (config) + "\t spike: " + str(spike) + "\t bin: " + str(bn))
+        self.__table[config][bn] += 1
+        #if(self.__table[config][bn] > 1):
+            #print("BIN: " + str(self.__table[config][bn]))
+
 def makeTable():
     '''
     Description
@@ -142,12 +166,8 @@ def makeTable():
     ---------
     'table': dict. Dictionary that contains orientation combination as key and all cells that are in V.
     '''
-    
-    # All possible temporal frequencies for the stimulus
-    temp_freqs   = [1, 2, 4, 8, 15]
-    
-    # All possible orientations of stimulus (angles)
-    orientations = [i*45 for i in range(8)]
+
+    bins = np.linspace(start, end, int( (end - start)/width + 1 )) 
     
     # In this table, each key is a different configuration of the stimulus
     # and each row corresponds to spikes in a time bin.
@@ -157,11 +177,8 @@ def makeTable():
         
         for angle in orientations:
 
-            config        = str(freq) + "_" + str(angle)
-            table[config] = []
-            
-    # Empty images
-    table['nan_nan'] = []
+            config        = str(freq) + "_" + str(angle) 
+            table[config] = np.zeros((len(bins), 1))
      
     return table
 
@@ -175,6 +192,9 @@ def binarySearch(spikes, interval, start, end):
     --------
     'spikes'  : list. list of all spikes of a given neuron.
     'interval': list. current time interval of stimulus (usually about 2 seconds).
+    'start'  : int. beginning
+    'end'    : int. end
+
 
     Output(s)
     ---------
@@ -221,7 +241,8 @@ def spikesInInterval(spikes, interval, known):
     '''
     Description
     -----------
-    'spikesInInterval' will find all spikes in a certain interval based on the index of one found in the interval.    
+    'spikesInInterval' will find all spikes in a certain interval based on the index of one found in the interval.  
+    
     Input(s)
     --------
     'spikes'  : list. list of all spikes of a given neuron.
@@ -243,8 +264,7 @@ def spikesInInterval(spikes, interval, known):
 
     # Set of spikes. We'll be using a set because 1) sets can't have duplicates and 2) checking for duplicates can be done in constant O(1) time. 
     spike_set = set()
-
-    
+  
     # We don't want to check out of bounds of the spikes list.
     while i > -1 or i < len(spikes):
 
@@ -265,7 +285,7 @@ def spikesInInterval(spikes, interval, known):
             break
 
     # Convert set to list, then return.
-    return list(spike_set)
+    return np.array(list(spike_set))
     
 
 def inside(spike, interval):
@@ -305,5 +325,102 @@ def midpoint(start, end):
     
     return int(start + (end - start)/2)
 
-
                            
+def insertToBin(spiketime, end):
+    
+    ## TODO
+    # I think best thing to do is to wrong 3 down to next multiple of timebins
+    # PROBABLY have to subtract "start"
+    # This doesn't support spikes that are not in the range.....
+    
+    idx = int( (spiketime - (spiketime % width)) / width )
+    
+    if( idx > end ): 
+        #print("spiketime " + str(spiketime) + "\tidx " + str(idx))
+        idx = end
+
+    return idx 
+
+
+
+def saveData(MOUSE_ID):
+    # open NWB files using h5py library
+    
+    ###### UPDATE PATH #################################
+    DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
+        
+    # Changes depending on the trial.
+    start     = 0 #in second
+    end       = 2000 #in seconds
+    
+    # Get file from directory
+    spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
+    nwb = h5.File(spikes_nwb_file, 'r')
+    
+    # names of probes
+    names = nwb['processing'].keys()
+    
+    # time stamps ( this never changes )
+    # This is SPECIFICALLY for the 'drifting_gratings_2' stimulus
+    timestamps  = nwb['stimulus']['presentation']['drifting_gratings_2']['timestamps'].value
+    stim_orient = nwb['stimulus']['presentation']['drifting_gratings_2']['data'].value
+    
+    
+    ## Adding spikes
+    for probe_name in names:
+        # Get all cells that are in V for every probe
+        #print(probe_name)
+        probe = Probe(nwb, probe_name)
+        
+        # Going to want to save this information later.
+        filename = MOUSE_ID + "_" + probe_name
+        
+        # ...get every cell. Then...
+        cells = probe.getCellList()
+        
+        # ... for every cell...
+        for cell in cells:
+            
+            #print("\tNeuron:\t" + str(cell))
+    
+            # (Getting current cell)
+            curr_cell = probe.getCell(cell)
+            
+            # ...get the current cells spiking activity.
+            spikes = nwb['processing'][probe_name]['UnitTimes'][str(cell)]['times'].value
+            
+            # For every occurrence of each kind of stimulus
+            for i in range(len(timestamps)):
+                
+                # Extract interval of stimulus, temporal frequency of stimulus, and angle of stimulus.
+                trial = timestamps[i]
+                freq  = stim_orient[i][1]
+                angle = stim_orient[i][3]
+                
+                # Checking for 'nans'
+                if not (str(freq) == "nan") or not (str(angle) == "nan"):
+                    freq  = int(freq)
+                    angle = int(angle)
+                    
+                    # Convert freq and angle to something that can be used as an index. 
+                    config = str(freq) + "_" + str(angle) 
+                    
+                    # Search for all spikes that are in this time frame. 
+                    stimulus_spikes = binarySearch(spikes, trial, 0, len(spikes)-1)
+                    
+                    
+                    if not (type(stimulus_spikes) == type(-1)):
+                # questionable but should do the trick (to get everything between 0 and 2000 ms)
+                        stimulus_spikes = (stimulus_spikes - trial[0])
+                        
+                        stimulus_spikes *= 1000
+                        
+                        # For all the spikes you just found, add them to the their respective bin.
+                        for stim_spike in stimulus_spikes:
+                            curr_cell.addSpike(config, stim_spike, end )
+                            
+        print("Saving to " + filename)
+    
+        with open(filename, 'wb') as f:
+                pickle.dump(probe, f)
+                

@@ -7,115 +7,79 @@ Created on Wed Jun 12 09:25:21 EDT 2019
 """
 ###### Imports ########
 from nwb_plots_functions import *
+from scipy.interpolate import CubicSpline
 from scipy.ndimage.filters import gaussian_filter1d
 
 import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pickle
 ########################
 
+MOUSE_ID   = '424448'
+probe_name = 'probeA'
+start      = 0 # in ms
+end        = 2000 #in ms
+width      = 1 # ms
+bins       = np.linspace(start, end, int( (end - start)/width + 1 ))
+num_trials = 630 # You should just get this from the data...
+    
+# All possible orientations of stimulus (angles and temporal frequencies)
+orientations = [i*45 for i in range(8)]
+temp_freqs   = [1, 2, 4, 8, 15]
 
-#### UPDATE SIZE ####
-BIN_WIDTH = 1000 # in s
+# File to get data from.
+filename = MOUSE_ID + "_" + probe_name
 
-# open NWB files using h5py library
-
-###### UPDATE PATH #################################
-DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
-
-# UPDATE MOUSE ID #
-MOUSE_ID = '424448'
-
-start     = 0 #in second
-end       = 3*60*60 #in seconds
-
-bins      = [(start+i*BIN_WIDTH) for i in range(end-start+1)]
-num_bins  = len(bins)
-
-# Get file from directory
-spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
-nwb = h5.File(spikes_nwb_file, 'r')
-
-# names of probes
-names = nwb['processing'].keys()
-
-# dictionary of probes
-probes = {}
-
-for probe_name in names:
-    # Get all cells that are in V for every probe
-    probes[probe_name] = Probe(nwb, probe_name)
+# plot directory
+PLOTS = '/Users/bjm/Documents/CMU/Research/data/plots/'
 
 
-# time stamps ( this never changes )
-# This is SPECIFICALLY for the 'drifting_gratings_2' stimulus
-timestamps  = nwb['stimulus']['presentation']['drifting_gratings_2']['timestamps'].value
-stim_orient = nwb['stimulus']['presentation']['drifting_gratings_2']['data'].value
+try:
+    with open(filename, 'rb') as f:
+        probe = pickle.load(f)
+        
+except FileNotFoundError:
+    saveData(MOUSE_ID)
+    print("Run again")
 
+# Summary of all activity across all cells in a probe.
+x = np.zeros((len(bins), 1))
+
+# Getting all data
+for cell in probe.getCellList():
+    for freq in temp_freqs:
+        for angle in orientations:
+            config = str(freq) + "_" + str(angle)
+            x = x + probe.getCell(cell).getSpikes(config)
+
+### Improve this
+z = []
+for i in range(len(x)):
+    y = [ i for ii in range(int(x[i])) ]
+    for num in y:
+        z.append(num)
+
+x,b,c = plt.hist(z, bins)
+plt.clf()
 ###
 
-## Adding spikes to time bin
+### Normalization
+# also divide by number of neurons in that particular region
+x /= num_trials*(0.0001)*len(probe.getCellList()) #Should I divide by number of cells?
 
-# For every probe...
-for probe_name in names:
+# Smoothing (with cubic spline)
+cs = CubicSpline(bins[0:len(bins)-1], x)    
+plt.plot(bins, cs(bins)) 
 
-    print(probe_name)
 
-    # ...get every cell. Then...
-    cells = probes[probe_name].getCellList()
+# Plotting
+plt.title(filename + ": " + probe.name)
+plt.bar(b[0:len(b)-1], x)
+plt.savefig(PLOTS + filename + ".png")
 
-    # ... for every cell...
-    for cell in cells:
-        
-        print("\t" + str(cell))
-        
-        # (Getting current cell)
-        curr_cell = probes[probe_name].getCell(cell)
 
-        # ...get the current cells spiking activity.
-        spikes = nwb['processing'][probe_name]['UnitTimes'][str(cell)]['times'].value
-
-        # For every occurrence of each kind of stimulus
-        for i in range(len(timestamps)):
-
-            # Extract interval of stimulus, temporal frequency of stimulus, and angle of stimulus.
-            interval = timestamps[i]
-            freq  = stim_orient[i][1]
-            angle = stim_orient[i][3]
-
-            # Checking for 'nans'
-            if not (str(freq) == "nan") or not (str(angle) == "nan"):
-                freq  = int(freq)
-                angle = int(angle)
-
-            # Convert freq and angle to something that can be used as an index. 
-            orient = str(freq) + "_" + str(angle)
-
-            # Search for all spikes that are in this time frame. 
-            stimulus_spikes = binarySearch(spikes, interval, 0, len(spikes)-1)
-
-            if not (stimulus_spikes == -1):
-
-                # For all the spikes you just found, add them to the their respective bin.
-                for stim_spike in stimulus_spikes:
-                    curr_cell.addSpike(orient, stim_spike)
-
-freq = probes['probeA'].getCell(43).getSpikes("1_0")
-
+'''smoothing
+-----------
 '''
-TODO: probe summer + cell summary (do cell summary first)
-'''
-
-
-'''
-TODO: (plotting)
-'''
-temp_freqs   = [1, 2, 4, 8, 15]
-orientations = [i*45 for i in range(8)]
-
-for freq in temp_freqs:
-    for angle in orientations:
-        orient = str(freq) + "_" + str(angle)
-        data = probes['probeA'].getCell(43).getSpikes(orient)
-        plt.hist(data, bins)
