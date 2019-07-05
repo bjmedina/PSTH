@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jun 12 09:25:21 EDT 2019
+
+@author: Bryan Medina
+"""
+###### Imports ########
+from nwb_plots_functions import *
+from scipy.interpolate import LSQUnivariateSpline
+
+import h5py as h5
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pickle
+import sys
+########################
+
+###### UPDATE PATH #################################
+DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
+
+MOUSE_ID = '424448'

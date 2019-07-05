@@ -39,6 +39,7 @@ class Probe:
 
     ## Set these
     max_frate = 0
+    max_ftime = 0
     avg_frate = 0
     std       = 0
     
