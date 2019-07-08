@@ -17,10 +17,15 @@ import pickle
 import sys
 ########################
 
-###### UPDATE PATH #################################
+
+## CHANGE ME ####################################################################################
+# Data directory
 DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 
+VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
+
 MOUSE_ID = '405751'
+#################################################################################################
 
 # Get file from directory
 spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
@@ -40,37 +45,44 @@ bins       = np.linspace(start, end, int( (end - start)/width + 1 ))
 # Number of times timulus is presented
 num_trials = 630 
     
-# All possible orientations of stimulus (angles and temporal frequencies)
+# All possible orientations of stimulus (angles and temporal frequencies) [drifting gratings]
 orientations = [i*45 for i in range(8)]
 temp_freqs   = [1, 2, 4, 8, 15]
 
+# For future plotting
 xs = np.linspace(0,2000,10000)
 
 # Knots for spline (selected by eye)
-knots = [0, 30, 50, 70, 100, 150, 200, 250, 300, 325, 375, 400]
+knots = [50, 70, 100, 150, 200, 250, 300, 325, 375, 400]
 
 # Allows plotting (takes more time)
-PLOTTING = False
+PLOTTING = True
 
 # Print Descriptions
 DESCRIPTIONS = True
 
-# Store firing rates per neuron depending on whether it's "high", "medium", or "low"
+# The median, 90th percentile neuron, and 10th percentile neuron.
+median_neuron = []
+neuron_90th   = []
+neuron_10th   = []
+
 for probe_name in probe_names:
     # File to get data from.
     probe_filename = MOUSE_ID + "_" + probe_name
     print(probe_filename)
     
-    # plot directory
-    ## CHANGE ME
+    # plot directories
+    
+    ## CHANGE ME ####################################################################################
     PROBE_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/probes/'
     CELL_PLOTS_DIRECTORY  = '/Users/bjm/Documents/CMU/Research/data/plots/cells/' + probe_name + '/'
-    
-    ## Loop this
+    #################################################################################################
+
+    ## Find probe to override
     try:
         with open(probe_filename, 'rb') as f:
             probe = pickle.load(f)
-            
+    ## If probe file doesn't exist, then we'll have to make that file from scratch        
     except FileNotFoundError:
         saveProbeData(MOUSE_ID, probe_name, nwb)
         print("Run again")
@@ -99,15 +111,14 @@ for probe_name in probe_names:
         probe.getCell(cell).max_frate = max(curr_cell[0:500])
         probe.getCell(cell).avg_frate = np.mean(curr_cell[0:500])
         probe.getCell(cell).std       = np.std(curr_cell[0:500])
+        probe.getCell(cell).name      = cell
 
-        # TODO
-        # ----
-        # Find valleys, peaks, and when they occur..
 
         if(DESCRIPTIONS):
-            print("%s\t Max: %3.2f\t Avg: %3.2f\t Std: %3.2f" % (cell, max(curr_cell), np.mean(curr_cell), np.std(curr_cell))) 
+            print(probe.getCell(cell)) 
         
         lsq = LSQUnivariateSpline(bins[0:len(bins)-1], curr_cell, knots[1:-1])
+        probe.getCell(cell).lsq = lsq
         
         # Plotting
         if(PLOTTING):
@@ -135,17 +146,38 @@ for probe_name in probe_names:
     ### Normalization
     # also divide by number of neurons in that particular region
     x /= num_trials*(0.001)*len(probe.getCellList())
-    probe.max_frate = max(x[0:500])
-    probe.max_ftime = np.where(x == probe.max_frate)[0]
-    probe.avg_frate = np.mean(x[0:500])
-    probe.std       = np.std(x[0:500])
+
+    # Need to find the two maxes and two mins
+
+    ################# Finding peaks and valleys #######################
+    # First we find the first peak
+    probe.max_frate  = max(x[0:500])
+    probe.max_ftime  = np.where(x[0:500] == probe.max_frate)[0][0]
+
+    # Now first valley
+    probe.min_frate  = min(x[0:probe.max_ftime])
+    probe.min_ftime  = np.where(x[0:probe.max_ftime] == probe.min_frate)[0][0]
+
+    # Now second peak
+    probe.max_frate2 = max(x[200:300])
+    probe.max_ftime2 = np.where(x[200:300] == probe.max_frate2)[0][0]
+
+    # Last valley
+    probe.min_frate2 = min(x[probe.max_ftime:probe.max_ftime2])
+    print("x[probe.max_ftime:probe.max_ftime2]")
+    probe.min_ftime2 = np.where(x[probe.max_ftime:probe.max_ftime2] == probe.min_frate2)[0][0]
+    
+    probe.avg_frate  = np.mean(x[0:500])
+    probe.std        = np.std(x[0:500])
+    ###################################################################
 
     if(DESCRIPTIONS):
-        print("%s\t Max: %3.2f @ %d\t Avg: %3.2f\t Std: %3.2f." % (probe.name, probe.max_frate, probe.max_ftime, probe.avg_frate, probe.std))
-        
+        print(probe)
+
     
     # Smoothing 
     lsq = LSQUnivariateSpline(bins[0:len(bins)-1], x, knots[1:-1])
+    probe.lsq = lsq
 
     if(PLOTTING):
         # Plotting

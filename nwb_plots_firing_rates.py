@@ -21,7 +21,7 @@ import sys
 DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
 
-MOUSE_ID = '421338'
+MOUSE_ID = '424448'
 
 # Get file from directory
 spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
@@ -60,11 +60,8 @@ except:
         probe_filename = MOUSE_ID + "_" + probe_name
         print(probe_filename)
 
-        ## Scrap this idea... only keep track of maximal firing rates...
-        probe_fr[probe_name] = {}
-        probe_fr[probe_name]["high"]   = 0
-        probe_fr[probe_name]["medium"] = 0
-        probe_fr[probe_name]["low"]    = 0
+        ## f only keep track of maximal firing rates...
+        probe_fr[probe_name] = []
         
         try:
             with open(probe_filename, 'rb') as f:
@@ -74,36 +71,11 @@ except:
             saveProbeData(MOUSE_ID, probe_name, nwb)
             print("Run again")
             sys.exit(1)
-
-        # Scrap this
-        high = probe.avg_frate + 2*probe.std
-        low  = probe.avg_frate - 2*probe.std
-            
+        
         # Getting all data for a given cell
         for cell in probe.getCellList():
-            # current cell spiking data
-            curr_cell = np.zeros((len(bins), 1))
-            for freq in temp_freqs:
-                for angle in orientations:
-                    config = str(freq) + "_" + str(angle)
-                    curr_cell += probe.getCell(cell).getSpikes(config)
-                    
-            z = fromFreqList(curr_cell)
-            curr_cell,b,c = plt.hist(z, bins)
-            plt.clf()
-            curr_cell /= num_trials*0.001
-
-            #print("HI: %f \t LO: %f" % (high, low))
-            for spike_rate in curr_cell:
-                if spike_rate >= high:
-                    probe_fr[probe_name]["high"] += 1
-                    #print("HI\t\t%f\t\tprobe_fr[probe_name][high]:%d" % (spike_rate, probe_fr[probe_name]["high"]))
-                elif spike_rate <= low:
-                    probe_fr[probe_name]["low"] += 1
-                    #print("LOW\t\t%f\t\tprobe_fr[probe_name][low]:%d" % (spike_rate, probe_fr[probe_name]["low"]))
-                else:
-                    probe_fr[probe_name]["medium"]+=1
-                    #print("MID\t\t%f\t\tprobe_fr[probe_name][mid]:%d" % (spike_rate, probe_fr[probe_name]["medium"]))
+            # Get max, add it here...
+            probe_fr[probe_name].append(probe.getCell(cell).max_frate)
 
     with open(filename, 'wb') as f:
         pickle.dump(probe_fr, f)
@@ -113,6 +85,6 @@ for probe_name in probe_names:
 
     plt.title("Mouse: " + str(MOUSE_ID) + " / " + probe_name + " Variation")
 
-    plt.bar(probe_fr[probe_name].keys(), probe_fr[probe_name].values())
+    plt.hist(probe_fr[probe_name])
     plt.savefig(VAR_DIREC + MOUSE_ID + probe_name +  "_variations.png")
     plt.clf()

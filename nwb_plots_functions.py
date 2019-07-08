@@ -38,10 +38,17 @@ mapping = {'probeA': 'AM',
 class Probe:
 
     ## Set these
-    max_frate = 0
-    max_ftime = 0
-    avg_frate = 0
-    std       = 0
+    max_frate  = 0
+    max_ftime  = 0
+    max_frate2 = 0
+    max_ftime2 = 0
+    min_frate  = 0
+    min_ftime  = 0
+    min_frate2 = 0
+    min_ftime2 = 0
+    avg_frate  = 0
+    std        = 0
+    lsq        = " "
     
     def __init__(self, nwb, name):
         '''
@@ -92,6 +99,20 @@ class Probe:
 
         return self.__cells.keys()
 
+    def __str__(self):
+        '''
+        Description
+        -----------
+        Method replaces default '__str__' with one that prints out average spiking rate, 2 maximum and 2 minimum firing rates, and the time in which they occur. 
+
+        Output(s)
+        ---------
+        String to print.
+        '''
+
+        return "%s\t Avg: %3.2f Std: %3.2f\t| Max: %3.2f @ %d\t| Max2: %3.2f @ %d\t| Min: %3.2f @ %d\t| Min2: %3.2f @ %d" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2)
+
+
 def getProbeCells(nwb, probe):
     '''
     Description
@@ -126,6 +147,8 @@ class Cell:
     max_frate = 0
     avg_frate = 0
     std       = 0
+    name      = " " 
+    lsq       = " "
     
     def __init__(self):
         '''
@@ -156,15 +179,38 @@ class Cell:
         return self.__table[config]
 
     def addSpike(self, config, spike, end):
-        # I think this is how it works... But it's the idea
-        # Has to be a little more complicated than this
-        # You need to put it in the right bin
-
+        '''
+        Description
+        -----------
+        Method adds 1 to spike counts
+        
+        Input(s)
+        --------
+        'config': string. key of dictionary.
+        'spike' : time of spike in seconds
+        'end'   : end of trial 
+        
+        Output(s)
+        ---------
+        table at certain config
+        '''
+        # Find out index spike needs to be in.
         bn = insertToBin(spike, end)
-        #print("config: " + (config) + "\t spike: " + str(spike) + "\t bin: " + str(bn))
+        
+        # Add one to ongoing count.
         self.__table[config][bn] += 1
-        #if(self.__table[config][bn] > 1):
-            #print("BIN: " + str(self.__table[config][bn]))
+
+    def __str__(self):
+        '''
+        Description
+        -----------
+        Method replaces default '__str__' with one that prints out average spiking rate, 2 maximum and 2 minimum firing rates, and the time in which they occur. 
+
+        Output(s)
+        ---------
+        String to print.
+        '''
+        return  "%s\t Max: %3.2f\t Avg: %3.2f\t Std: %3.2f" % (self.__name, self.max_frate, self.avg_frate, self.std)
 
 def makeTable():
     '''
@@ -177,11 +223,11 @@ def makeTable():
     'table': dict. Dictionary that contains orientation combination as key and all cells that are in V.
     '''
 
-    bins = np.linspace(start, end, int( (end - start)/width + 1 )) 
+    bins  = np.linspace(start, end, int( (end - start)/width + 1 )) 
     
     # In this table, each key is a different configuration of the stimulus
     # and each row corresponds to spikes in a time bin.
-    table        = {}
+    table = {}
 
     for freq in temp_freqs:
         
@@ -189,7 +235,8 @@ def makeTable():
 
             config        = str(freq) + "_" + str(angle) 
             table[config] = np.zeros((len(bins), 1))
-     
+
+    
     return table
 
 def binarySearch(spikes, interval, start, end):
@@ -202,8 +249,8 @@ def binarySearch(spikes, interval, start, end):
     --------
     'spikes'  : list. list of all spikes of a given neuron.
     'interval': list. current time interval of stimulus (usually about 2 seconds).
-    'start'  : int. beginning
-    'end'    : int. end
+    'start'   : int. beginning
+    'end'     : int. end
 
 
     Output(s)
@@ -224,8 +271,8 @@ def binarySearch(spikes, interval, start, end):
 
             next_midpoint = midpoint(start, mid_point-1)
 
-            # If this is true, then we're going to hit a recursion error....
-            # We don't want this.
+            # If this is true, then we're going to hit a recursion error...
+            # We don't want that to happen.
             if mid_point == next_midpoint:
                 return -1
             
@@ -235,7 +282,7 @@ def binarySearch(spikes, interval, start, end):
             
             next_midpoint = midpoint(mid_point+1, end)
             
-            # If this is true, then we're going to hit a recursion error....
+            # If this is true, then we're going to hit a recursion error...
             # We don't want this.            
             if mid_point == next_midpoint:
                 return -1
@@ -449,11 +496,11 @@ def fromFreqList(x):
     '''
     Description
     -----------
-    'fromFreqList' converts frequency list to a list of repitions based on index
+    'fromFreqList' converts frequency list to a list of repitions based on index. This is usefull for histograms.
 
     Example
     -------
-    fromFreqList([1,2,3,4]) => [0, 1, 1, 2, 2, 2, 3, 3, 3, 3]
+    fromFreqList([2,1,4,2]) => [0,0,1,2,2,2,2,3,3]
  
     Input(s)
     --------
