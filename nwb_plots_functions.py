@@ -7,15 +7,16 @@ Created on Wed Jun 12 09:25:21 EDT 2019
 """
 ###### Imports ########
 from scipy.ndimage.filters import gaussian_filter1d
+from scipy.interpolate import LSQUnivariateSpline
+
 
 import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pickle
+import sys
 ########################
-
-width = 1
 
 ### This is for the 'drifting gratings' stimulus
 # All possible temporal frequencies for the stimulus
@@ -23,9 +24,30 @@ temp_freqs   = [1, 2, 4, 8, 15]
 
 # All possible orientations of stimulus (angles)
 orientations = [i*45 for i in range(8)]
-    
+
+# Knots for spline (selected by eye)
+knots = [15, 50, 60, 70, 80, 100, 150, 200, 250, 300, 325, 375, 400]
+
+# Number of times timulus is presented
+num_trials = 630
+
+# Conversion frmo ms to s
+msToSec    = 1000 # 1000 ms in 1 sec
+
+# For future plotting
+xs = np.linspace(0,600,3000)
+
+# Start and end of trials
 start   = 0
 end     = 2000
+
+# Bin width
+width = 1
+
+# Actual bins (for later use)
+bins       = np.linspace(start, end, int( (end - start)/width + 1 ))
+
+# Probe to region mapping
 mapping = {'probeA': 'AM',
         'probeB': 'PM',
         'probeC': 'V1',
@@ -46,6 +68,7 @@ class Probe:
     min_ftime  = 0
     min_frate2 = 0
     min_ftime2 = 0
+    converge   = 0
     avg_frate  = 0
     std        = 0
     lsq        = " "
@@ -110,7 +133,7 @@ class Probe:
         String to print.
         '''
 
-        return "%s\t Avg: %3.2f Std: %3.2f\t| Max: %3.2f @ %d\t| Max2: %3.2f @ %d\t| Min: %3.2f @ %d\t| Min2: %3.2f @ %d" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2)
+        return "%s\t Avg: %3.2f Std: %3.2f | Max: %3.2f @ %d | Max2: %3.2f @ %d | Min: %3.2f @ %d | Min2: %3.2f @ %d | Converges to %3.2f" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2, self.converge)
 
 
 def getProbeCells(nwb, probe):
@@ -210,7 +233,7 @@ class Cell:
         ---------
         String to print.
         '''
-        return  "%s\t Max: %3.2f\t Avg: %3.2f\t Std: %3.2f" % (self.__name, self.max_frate, self.avg_frate, self.std)
+        return  "Max: %3.2f\t Avg: %3.2f\t Std: %3.2f" % (self.max_frate, self.avg_frate, self.std)
 
 def makeTable():
     '''
@@ -364,7 +387,7 @@ def inside(spike, interval):
     return spike >= interval[0] and spike <= interval[1]
 
 
-def midpoint(start, end):
+def midpoint(start_rate, end_rate):
     '''
     Description
     -----------
@@ -372,15 +395,15 @@ def midpoint(start, end):
  
     Input(s)
     --------
-    'start'  : int. beginning
-    'end'    : int. end
+    'start_rate'  : int. beginning
+    'end_rate'    : int. end
 
     Output(s)
     --------
-    int. midpoint between 'start' and 'end'
+    int. midpoint between 'start_rate' and 'end_rate'
     '''
     
-    return int(start + (end - start)/2)
+    return int(start_rate + (end_rate - start_rate)/2)
 
                            
 def insertToBin(spiketime, end):
