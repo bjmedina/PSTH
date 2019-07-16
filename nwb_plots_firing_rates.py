@@ -25,13 +25,16 @@ probe_names = nwb['processing']
 # keeps track of max firing rate for each cell in 
 probe_fr = {}
 
-alphas = {'424448': 1,
-          '421338': 0.6,
-          '405751': 0.4}
+colors = {'424448':'red',
+          '421338':'green',
+          '405751':'blue'}
 
 # firing rate filename
 filename = MOUSE_ID + '_probes_fr'
 PLOT_ALL = False
+
+rows = 2
+cols = 2
 
 # We want to check to see if we have this data
 try:
@@ -64,7 +67,6 @@ except:
             # Get max, add it here...
             probe_fr[probe_name].append(probe.getCell(cell).max_frate)
 
-
 # Plot everything
 for probe_name in probe_names:
     # Plot variability of every region
@@ -80,25 +82,48 @@ for probe_name in probe_names:
             plt.savefig(VAR_DIREC + MOUSE_ID + probe_name +  "_variations.png")
             plt.clf()
 
-for MOUSE in MICE_ID:
-    
-    variability = []
+# Plotting multiple summary plots in one plot.
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8))
+fig.suptitle("Variation in Maximal Firing Rates")
+fig.text(0.5, 0.04, 'Maximal Firing Rate (Spikes/sec)', ha='center')
+fig.text(0.04, 0.5, 'Number of Neurons', va='center', rotation='vertical')
 
-    filename = MOUSE + '_probes_fr'
+variability = []
+curves = {}
+i = 0
 
-    with open(filename, 'rb') as f:
-        probe_fr = pickle.load(f)
+# Plotting 4 plots in one figure.
+for row in range(0, rows):
+    for col in range(0, cols):
 
-    for probe_name in probe_names:
-        variability.extend(probe_fr[probe_name])
+        if( not (row + 1 == rows and col + 1 == cols) ):
+            MOUSE = MICE_ID[i]
+            filename = MOUSE + '_probes_fr'
+            
+            with open(filename, 'rb') as f:
+                probe_fr = pickle.load(f)
                 
-    plt.hist(variability, bins = 100, label="Mouse: " + MOUSE, alpha=alphas[MOUSE], edgecolor='black')
+            for probe_name in probe_names:
+                variability.extend(probe_fr[probe_name])
+                
+            axes[row, col].set_ylim([0, 90])
+            axes[row, col].set_xlim([0, 100])
+            axes[row, col].set_title("Mouse %s" % (MOUSE))
+            ys, bins, c = axes[row, col].hist(variability, bins = 100,color=colors[MOUSE], edgecolor='black', alpha=0.7)    
+            curves[MOUSE] = [LSQUnivariateSpline(bins[0:len(bins)-1], ys, [10, 30, 55, 70, 100]), bins[0:len(bins)-1]]
+            i = i+1
+            variability = []
 
-plt.legend()
-plt.title("Variability of Maximal Firing Rates")
-plt.xlabel("Maximal Firing Rate (Spikes/Sec)")
-plt.ylabel("Number of Neurons")
-plt.savefig(VAR_DIREC + "variations.png")
+        else:
+            axes[row, col].set_ylim([0, 90])
+            axes[row, col].set_xlim([0, 100])
+            axes[row, col].set_title("All Variations")
+
+            for ID in MICE_ID:
+                axes[row, col].plot(curves[ID][1], curves[ID][0](curves[ID][1]), label=ID, color=colors[ID], alpha=0.7)
+            axes[row, col].legend()
+
+plt.savefig(VAR_DIREC + "firing_rate_variations.png")
 
 # Save the probe_fr file.
 with open(filename, 'wb') as f:
