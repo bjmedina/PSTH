@@ -10,7 +10,7 @@ from nwb_plots_functions import *
 # This file plots
 # - (1) PSTHs for every cell (averaged across all trials) as well as a smoothed curve
 # - (2) PSTHs for every probe (averaged across all trials and all cells) as well as a smoothed curve
-# - and (3) Smoothed curve for every probe
+# - (3) Smoothed curve for every probe
 ##########################################
 
 ## CHANGE ME #############################################################
@@ -21,6 +21,7 @@ VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
 MOUSE_ID = '424448'
 ##########################################################################
 
+
 # Get file from directory
 spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
 nwb = h5.File(spikes_nwb_file, 'r')
@@ -28,15 +29,15 @@ nwb = h5.File(spikes_nwb_file, 'r')
 probe_names = nwb['processing']
 
 # Allows plotting (takes more time)
-PLOTTING = False
+PLOTTING = True
 
 # Print Descriptions
 DESCRIPTIONS = True
 
+# Turn this on if it's your first time running this code.
 ALL_PLOTS = True
 
 if(ALL_PLOTS):
-    
     for probe_name in probe_names:
         # File to get data from.
         probe_filename = MOUSE_ID + "_" + probe_name
@@ -58,14 +59,13 @@ if(ALL_PLOTS):
             
             for probe_name in probe_names:
                 saveProbeData(MOUSE_ID, probe_name, nwb)
-                
+            
             print("Run again")
             sys.exit(1)
-            
-            
+    
         # Summary of all activity across all cells in a probe.
         x = np.zeros((len(bins), 1))
-        
+    
         # Plotting (1) #####################
         # Getting all data for a given cell
         for cell in probe.getCellList():
@@ -77,7 +77,7 @@ if(ALL_PLOTS):
                     curr_cell += probe.getCell(cell).getSpikes(config)
                     # Plot curr cell
                     x += probe.getCell(cell).getSpikes(config)
-                    
+                
                     
             # Convert cell spiking data to a format 'plt.hist' will like
             z = fromFreqList(curr_cell)
@@ -86,33 +86,45 @@ if(ALL_PLOTS):
             
             # Normalize
             curr_cell /= num_trials*0.001
+            
+            # Get some information on the cell such as max firing rate, avg, std, and name
+            ################# Finding peaks and valleys #######################
             probe.getCell(cell).max_frate = max(curr_cell[0:500])
+            probe.getCell(cell).max_ftime = np.where(curr_cell[0:500] == probe.getCell(cell).max_frate)[0][0]
             probe.getCell(cell).avg_frate = np.mean(curr_cell[0:500])
             probe.getCell(cell).std       = np.std(curr_cell[0:500])
             probe.getCell(cell).name      = cell
             
+            # Also get the associated firing rate curve for the cell
+            lsq = LSQUnivariateSpline(bins[0:len(bins)-1], curr_cell, knots)
+            probe.getCell(cell).lsq = lsq
+
+            cpm_result = cpm.detectChangePoint(FloatVector(lsq(curr_cell[0:probe.getCell(cell).max_ftime])), cpmType='Student', ARL0=1000)
+            cpm_result = robj_to_dict(cpm_result)
+            
+            probe.getCell(cell).change_pt = lsq(cpm_result['changePoint'][0])
+            probe.getCell(cell).chg_time  = cpm_result['changePoint'][0]
+            ####################################################################
             
             if(DESCRIPTIONS):
                 print("Cell " + str(cell) + " : " + str(probe.getCell(cell))) 
                 
-            lsq = LSQUnivariateSpline(bins[0:len(bins)-1], curr_cell, knots[1:-1])
-            probe.getCell(cell).lsq = lsq
-            
             # Plotting
             if(PLOTTING):
                 # Plotting normalized cell activity
                 cell_filename  = MOUSE_ID + "_cell" + str(cell)
+                plt.axvline(x=probe.getCell(cell).chg_time, alpha=0.5, linestyle='--', color='magenta')
                 plt.ylim(0, 75)
                 plt.xlim(-20, 520)
                 plt.ylabel('Spikes/second')
                 plt.xlabel('Bins')
                 plt.title("Mouse: " + str(MOUSE_ID) + " / " +  probe_name + " in "+ probe.name + ". Cell: " + str(cell))
-                plt.plot(xs, lsq(xs), color = 'magenta', alpha=0.76) 
+                plt.plot(xs, lsq(xs), color = 'magenta', alpha=0.9) 
                 plt.bar(b[0:len(b)-1], curr_cell)
                 plt.savefig(CELL_PLOTS_DIRECTORY + cell_filename + ".png")
                 plt.clf()    
-                # End Plotting (1) ####################
-                
+            # End Plotting (1) ####################
+            
         # Plotting normalized probe activity
         z = fromFreqList(x)
         x,b,c = plt.hist(z, bins)
@@ -124,7 +136,7 @@ if(ALL_PLOTS):
         x /= num_trials*(0.001)*len(probe.getCellList())
         
         # Need to find the two maxes and two mins
-
+        
         ################# Finding peaks and valleys #######################
         # First we find the first peak and the time it occurs at.
         probe.max_frate  = max(x[0:500]) 
@@ -142,24 +154,33 @@ if(ALL_PLOTS):
         probe.min_frate2 = min(x[probe.max_ftime:probe.max_ftime2])
         probe.min_ftime2 = np.where(x[probe.max_ftime:probe.max_ftime2] == probe.min_frate2)[0][0] + probe.max_ftime
         
-        # Should find one more piece of information... The value it converges towards the end.
+        # The value it converges towards the end.
         probe.converge   = min(x[probe.max_ftime2:500])
         
         # Average firing rate + standard deviation
         probe.avg_frate  = np.mean(x[0:500])
         probe.std        = np.std(x[0:500])
+
+        # Smoothed Function
+        lsq = LSQUnivariateSpline(bins[0:len(bins)-1], x, knots)
+        probe.lsq = lsq
+        
+        # Get the change point here 
+        cpm_result = cpm.detectChangePoint(FloatVector(lsq(xs[probe.min_ftime-5:probe.max_ftime+1])), cpmType='Student', ARL0=1000)
+        cpm_result = robj_to_dict(cpm_result)
+        
+        # Set chnage point and change point time
+        probe.change_pt = lsq(cpm_result['changePoint'][0]+probe.min_ftime-5)
+        probe.chg_time  = cpm_result['changePoint'][0]+probe.min_ftime-5
         ###################################################################
         
         if(DESCRIPTIONS):
             print(str(probe))
-
+            
         # Plotting (2) ###############################################
-        # Smoothing 
-        lsq = LSQUnivariateSpline(bins[0:len(bins)-1], x, knots[1:-1])
-        probe.lsq = lsq
-
         if(PLOTTING):
             # Plotting
+            plt.axvline(x=probe.chg_time, color='red', linestyle='--', alpha=0.7)
             plt.ylim(0, 12)
             plt.xlim(-20, 500)
             plt.ylabel('Spikes/second')
@@ -170,7 +191,7 @@ if(ALL_PLOTS):
             plt.savefig(PROBE_PLOTS_DIRECTORY + probe_filename + ".png")
             
             plt.clf()
-
+        
         with open(probe_filename, 'wb') as f:
             pickle.dump(probe, f)
         # End Plotting (2) ###########################################
@@ -185,8 +206,9 @@ for probe_name in probe_names:
     with open(probe_filename, 'rb') as f:
         # Plotting all curves for every region for a given mouse.
         probe = pickle.load(f)
-    plt.ylabel('Spikes/second')
-    plt.xlabel('Bins')
+    
+    plt.ylabel('Firing Rate (Spikes/second)')
+    plt.xlabel('Bins (ms)')
     plt.ylim(0, 12)
     plt.xlim(-20, 500)
     plt.title("Mouse: " + str(MOUSE_ID) + " | Average Firing Rates")
@@ -197,10 +219,3 @@ plt.savefig(SUMMARY_PLOTS_DIRECTORY + str(MOUSE_ID) + ".png")
 plt.clf()
 # End Plotting (3) ###########################################
 
-'''
-TODO: 
-MORT1dSMOOTH
-15.2.3 (leading upto as well)
-BARS (poisson version)
-419
-'''

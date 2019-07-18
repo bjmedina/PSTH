@@ -6,7 +6,8 @@ Created on Wed Jun 12 09:25:21 EDT 2019
 @author: Bryan Medina 
 """
 ###### Imports ########
-from scipy.ndimage.filters import gaussian_filter1d
+from rpy2.robjects.vectors import StrVector
+from rpy2.robjects.vectors import FloatVector
 from scipy.interpolate import LSQUnivariateSpline
 
 
@@ -15,8 +16,29 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pickle
+import rpy2.robjects as robjects
+import rpy2.robjects.packages as rpackages
 import sys
 ########################
+
+# Setting up packages for rpy2 use
+package_name = 'cpm'
+
+if rpackages.isinstalled(package_name):
+    have_package = True
+    print("R package %s already installed" % package_name)
+else:
+    have_pakcage = False
+
+if not have_package:
+    utils = rpackages.importr('utils')
+    utils.chooseCRANmirror(ind=1)
+
+    utils.install_packages(package_name)
+    print("installed R package: %s" % package_name)
+
+cpm = rpackages.importr(package_name)
+##################################
 
 ### This is for the 'drifting gratings' stimulus
 # All possible temporal frequencies for the stimulus
@@ -26,7 +48,7 @@ temp_freqs   = [1, 2, 4, 8, 15]
 orientations = [i*45 for i in range(8)]
 
 # Knots for spline (selected by eye)
-knots = [15, 50, 60, 70, 80, 100, 150, 200, 250, 300, 325, 375, 400]
+knots = [30, 50, 52, 55, 65, 70, 75, 80,  83, 100, 150, 200, 250, 300, 325, 375, 400]
 
 # Number of times timulus is presented
 num_trials = 630
@@ -38,14 +60,14 @@ msToSec    = 1000 # 1000 ms in 1 sec
 xs = np.linspace(0,600,3000)
 
 # Start and end of trials
-start   = 0
-end     = 2000
+start = 0
+end   = 2000
 
 # Bin width
 width = 1
 
 # Actual bins (for later use)
-bins       = np.linspace(start, end, int( (end - start)/width + 1 ))
+bins  = np.linspace(start, end, int( (end - start)/width + 1 ))
 
 # Probe to region mapping
 mapping = {'probeA': 'AM',
@@ -59,18 +81,36 @@ mapping = {'probeA': 'AM',
 
 class Probe:
 
-    ## Set these
+    # Max firing rate and the time it occurs
     max_frate  = 0
     max_ftime  = 0
+
+    # Second highest firing rate
     max_frate2 = 0
     max_ftime2 = 0
+
+    # Min firing rate and the time it occurs
     min_frate  = 0
     min_ftime  = 0
+
+    # Second lowest 
     min_frate2 = 0
     min_ftime2 = 0
+
+    # Average firing rate that is converged to as t -> 500 ms 
     converge   = 0
+
+    # Change point (before the first peak)
+    change_pt  = 0
+    chg_time   = 0 
+
+    # Average firing rate
     avg_frate  = 0
+
+    # Standard deviation of the firing rates
     std        = 0
+
+    # LSQUnivariate function 
     lsq        = " "
     
     def __init__(self, nwb, name):
@@ -133,7 +173,7 @@ class Probe:
         String to print.
         '''
 
-        return "%s\t Avg: %3.2f Std: %3.2f | Max: %3.2f @ %d | Max2: %3.2f @ %d | Min: %3.2f @ %d | Min2: %3.2f @ %d | Converges to %3.2f" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2, self.converge)
+        return "%s\t Avg: %3.2f Std: %3.2f | Max: %3.2f @ %d | Max2: %3.2f @ %d | Min: %3.2f @ %d | Min2: %3.2f @ %d | Converges to %3.2f | Change: %3.2f @ %d" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2, self.converge, self.change_pt, self.chg_time)
 
 
 def getProbeCells(nwb, probe):
@@ -168,10 +208,14 @@ def getProbeCells(nwb, probe):
 class Cell:
 
     max_frate = 0
+    max_ftime = 0
     avg_frate = 0
     std       = 0
     name      = " " 
     lsq       = " "
+    # Change point (before the first peak)
+    change_pt  = 0
+    chg_time   = 0 
     
     def __init__(self):
         '''
@@ -540,3 +584,24 @@ def fromFreqList(x):
             z.append(num)
 
     return z
+
+def robj_to_dict(robj):
+    '''
+    Description
+    -----------
+    'robj_to_dict' converts an R object to a python dictionary
+ 
+    Input(s)
+    --------
+    'robj': R object 
+
+    Output(s)
+    --------
+    dictionary.
+
+    Source
+    ------
+    https://medium.com/bigdatarepublic/contextual-changepoint-detection-with-python-and-r-using-rpy2-fa7d86259ba9
+    
+    '''    
+    return dict(zip(robj.names, map(list, robj)))
