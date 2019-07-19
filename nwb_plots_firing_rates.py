@@ -12,8 +12,9 @@ from nwb_plots_functions import *
 ###### UPDATE PATH #################################
 DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
-MOUSE_ID  = '424448'
 MICE_ID = ['424448', '421338', '405751']
+MOUSE_ID  = '421338'
+
 ####################################################
 
 # Get file from directory
@@ -31,14 +32,16 @@ colors = {'424448':'red',
 
 # firing rate filename
 filename = MOUSE_ID + '_probes_fr'
-PLOT_ALL = False
+PLOT_ALL = True
 
 rows = 2
 cols = 2
 
+# Ideally, you should do this for every mouse.
+
 # We want to check to see if we have this data
 try:
-    with open(filename, 'rb') as f:
+    with open(filename+"_", 'rb') as f:
         probe_fr = pickle.load(f)
         
 except:
@@ -78,9 +81,10 @@ for probe_name in probe_names:
             plt.ylim(0, 14)
             plt.xlabel("Maximal Firing Rate (Spikes/Sec)")
             plt.ylabel("Number of Neurons")
-            plt.hist(probe_fr[probe_name], bins = 100)
+            plt.hist(probe_fr[probe_name], bins = 100, edgecolor='black')
             plt.savefig(VAR_DIREC + MOUSE_ID + probe_name +  "_variations.png")
             plt.clf()
+
 
 # Plotting multiple summary plots in one plot.
 fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8,8))

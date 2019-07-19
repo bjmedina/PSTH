@@ -18,7 +18,7 @@ from nwb_plots_functions import *
 DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 SUMMARY_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/'
 VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
-MOUSE_ID = '424448'
+MOUSE_ID = '421338'
 ##########################################################################
 
 
@@ -65,7 +65,7 @@ if(ALL_PLOTS):
     
         # Summary of all activity across all cells in a probe.
         x = np.zeros((len(bins), 1))
-    
+
         # Plotting (1) #####################
         # Getting all data for a given cell
         for cell in probe.getCellList():
@@ -78,7 +78,6 @@ if(ALL_PLOTS):
                     # Plot curr cell
                     x += probe.getCell(cell).getSpikes(config)
                 
-                    
             # Convert cell spiking data to a format 'plt.hist' will like
             z = fromFreqList(curr_cell)
             curr_cell,b,c = plt.hist(z, bins)
@@ -124,7 +123,7 @@ if(ALL_PLOTS):
                 plt.savefig(CELL_PLOTS_DIRECTORY + cell_filename + ".png")
                 plt.clf()    
             # End Plotting (1) ####################
-            
+        
         # Plotting normalized probe activity
         z = fromFreqList(x)
         x,b,c = plt.hist(z, bins)
@@ -196,9 +195,13 @@ if(ALL_PLOTS):
             pickle.dump(probe, f)
         # End Plotting (2) ###########################################
 
+        
 
 # Plotting (3) ###############################################
 # Here, we'll plot all curves for every region for a given mouse.
+probes = []
+
+# First, lets order the probe in terms of the time in which the max firing rate occurs
 for probe_name in probe_names:
     
     probe_filename = MOUSE_ID + "_" + probe_name
@@ -206,13 +209,21 @@ for probe_name in probe_names:
     with open(probe_filename, 'rb') as f:
         # Plotting all curves for every region for a given mouse.
         probe = pickle.load(f)
-    
+
+    probes.append(probe)
+
+probes.sort(key=lambda x: x.max_ftime)
+
+# Finally, we can plot
+for i in range(0, len(probes)):
+
+    probe = probes[i]
     plt.ylabel('Firing Rate (Spikes/second)')
     plt.xlabel('Bins (ms)')
     plt.ylim(0, 12)
     plt.xlim(-20, 500)
     plt.title("Mouse: " + str(MOUSE_ID) + " | Average Firing Rates")
-    plt.plot(xs, probe.lsq(xs), label = probe.name)
+    plt.plot(xs, probe.lsq(xs), label = probe.name, color=colors[i])
 
 plt.legend()
 plt.savefig(SUMMARY_PLOTS_DIRECTORY + str(MOUSE_ID) + ".png")

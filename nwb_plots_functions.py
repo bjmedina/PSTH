@@ -51,7 +51,7 @@ orientations = [i*45 for i in range(8)]
 knots = [30, 50, 52, 55, 65, 70, 75, 80,  83, 100, 150, 200, 250, 300, 325, 375, 400]
 
 # Number of times timulus is presented
-num_trials = 630
+num_trials = 600
 
 # Conversion frmo ms to s
 msToSec    = 1000 # 1000 ms in 1 sec
@@ -76,6 +76,8 @@ mapping = {'probeA': 'AM',
         'probeD': 'LM',
         'probeE': 'AL',
         'probeF': 'RL'}
+
+colors = ['k', '#9400D3', 'b', 'g', '#FF7F00', 'r']
 
 ###
 
@@ -162,7 +164,7 @@ class Probe:
 
         return self.__cells.keys()
 
-    def __str__(self):
+    def __repr__(self):
         '''
         Description
         -----------
@@ -175,6 +177,18 @@ class Probe:
 
         return "%s\t Avg: %3.2f Std: %3.2f | Max: %3.2f @ %d | Max2: %3.2f @ %d | Min: %3.2f @ %d | Min2: %3.2f @ %d | Converges to %3.2f | Change: %3.2f @ %d" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2, self.converge, self.change_pt, self.chg_time)
 
+    def __str__(self):
+        '''
+        Description
+        -----------
+        Method replaces default '__repr__' with one that's great for LaTeX-table making.
+
+        Output(s)
+        ---------
+        String to print.
+        '''
+
+        return "%s & %3.2f & %3.2f & (%3.2f, %d) & (%3.2f, %d) & (%3.2f, %d) & (%3.2f, %d) & %3.2f & (%3.2f, %d)\\\\" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2, self.converge, self.change_pt, self.chg_time)
 
 def getProbeCells(nwb, probe):
     '''
@@ -278,6 +292,17 @@ class Cell:
         String to print.
         '''
         return  "Max: %3.2f\t Avg: %3.2f\t Std: %3.2f" % (self.max_frate, self.avg_frate, self.std)
+
+def Trial():
+    # The trial number
+    number = -1
+
+    # The configuration
+    config = ""
+
+    # Should be five values for each of these
+    t = []
+    beta = []
 
 def makeTable():
     '''

@@ -21,7 +21,7 @@ import sys
 DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
 PERC_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/percentile/'
-MOUSE_ID = '421338'
+MOUSE_ID = '424448'
 ####################################################
 
 # Get file from directory
@@ -80,6 +80,7 @@ fig.suptitle("Mouse %s Neural Activity" % (MOUSE_ID))
 fig.text(0.5, 0.04, 'Bins (ms)', ha='center')
 fig.text(0.04, 0.5, 'Firing Rate (Spike/sec)', va='center', rotation='vertical')
 i = 0
+
 for row in range(0, rows):
     for col in range(0, cols):
 
@@ -128,6 +129,6 @@ for row in range(0, rows):
         # Next probe
         i = i+1
 
-plt.savefig(PERC_PLOTS_DIRECTORY + str(MOUSE_ID) + ".png")
+plt.savefig(PERC_PLOTS_DIRECTORY + str(MOUSE_ID) + "_percentile.png")
 plt.clf()
 
