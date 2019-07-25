@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
 """
 Created on Wed Jun 12 09:25:21 EDT 2019
 
@@ -18,7 +17,7 @@ from nwb_plots_functions import *
 DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 SUMMARY_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/'
 VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
-MOUSE_ID = '421338'
+MOUSE_ID = '424448'
 ##########################################################################
 
 
@@ -109,7 +108,7 @@ if(ALL_PLOTS):
                 print("Cell " + str(cell) + " : " + str(probe.getCell(cell))) 
                 
             # Plotting
-            if(PLOTTING):
+            if(not PLOTTING):
                 # Plotting normalized cell activity
                 cell_filename  = MOUSE_ID + "_cell" + str(cell)
                 plt.axvline(x=probe.getCell(cell).chg_time, alpha=0.5, linestyle='--', color='magenta')
@@ -135,8 +134,8 @@ if(ALL_PLOTS):
         x /= num_trials*(0.001)*len(probe.getCellList())
         
         # Need to find the two maxes and two mins
-        
-        ################# Finding peaks and valleys #######################
+
+         ################# Finding peaks and valleys #######################
         # First we find the first peak and the time it occurs at.
         probe.max_frate  = max(x[0:500]) 
         probe.max_ftime  = np.where(x[0:500] == probe.max_frate)[0][0]
@@ -173,8 +172,9 @@ if(ALL_PLOTS):
         probe.chg_time  = cpm_result['changePoint'][0]+probe.min_ftime-5
         ###################################################################
         
+        
         if(DESCRIPTIONS):
-            print(str(probe))
+            print(repr(probe))
             
         # Plotting (2) ###############################################
         if(PLOTTING):

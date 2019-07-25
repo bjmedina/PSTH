@@ -6,10 +6,12 @@ Created on Wed Jun 12 09:25:21 EDT 2019
 @author: Bryan Medina 
 """
 ###### Imports ########
+from random import choices
 from rpy2.robjects.vectors import StrVector
 from rpy2.robjects.vectors import FloatVector
 from scipy.interpolate import LSQUnivariateSpline
-
+from scipy.interpolate import CubicSpline
+from scipy.interpolate import UnivariateSpline
 
 import h5py as h5
 import matplotlib.pyplot as plt
@@ -48,7 +50,8 @@ temp_freqs   = [1, 2, 4, 8, 15]
 orientations = [i*45 for i in range(8)]
 
 # Knots for spline (selected by eye)
-knots = [30, 50, 52, 55, 65, 70, 75, 80,  83, 100, 150, 200, 250, 300, 325, 375, 400]
+knots    = [30, 50, 52, 55, 65, 70, 75, 80,  83, 100, 150, 200, 250, 300, 325, 375, 400]
+tr_knots = [50, 110, 160, 200, 250, 300, 350, 400, 450]
 
 # Number of times timulus is presented
 num_trials = 600
@@ -293,7 +296,7 @@ class Cell:
         '''
         return  "Max: %3.2f\t Avg: %3.2f\t Std: %3.2f" % (self.max_frate, self.avg_frate, self.std)
 
-def Trial():
+class Trial:
     # The trial number
     number = -1
 
@@ -301,8 +304,30 @@ def Trial():
     config = ""
 
     # Should be five values for each of these
-    t = []
-    beta = []
+    t      = [None]*5
+    beta   = [None]*5
+
+    # Need to make this go from start to end ... This will hold the PSTH.
+    spikes = np.zeros((len(bins), 1))
+
+    lsq    = []
+
+    def __add__(self, other_trial):
+        '''
+        Description
+        -----------
+        Method overrides '+' operator so that you can add two Trial objects
+
+        Input(s)
+        --------
+        'other_trial': Trial. Another trial object
+        
+        Output(s)
+        ---------
+        sum of two trials (adds spiking histogram)
+        '''
+        pass
+        
 
 def makeTable():
     '''
@@ -558,6 +583,7 @@ def saveProbeData(MOUSE_ID, probe_name, nwb):
             
             # Checking for 'nans'
             if not (str(freq) == "nan") or not (str(angle) == "nan"):
+                
                 freq  = int(freq)
                 angle = int(angle)
                 
@@ -576,7 +602,7 @@ def saveProbeData(MOUSE_ID, probe_name, nwb):
                     
                     # For all the spikes you just found, add them to the their respective bin.
                     for stim_spike in stimulus_spikes:
-                        curr_cell.addSpike(config, stim_spike, end )
+                        curr_cell.addSpike(config, stim_spike, end)
                         
     print("Saving to " + filename)
     
