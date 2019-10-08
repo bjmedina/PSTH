@@ -1,15 +1,13 @@
-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Created on Wed Jun 12 09:25:21 EDT 2019
+Created on Wed Jul 24 11:41:32 EDT 2019
 
 @author: Bryan Medina
 """
 from nwb_plots_functions import *
 # READ ME ################################
-# This file plots
-# - (1) PSTHs for every cell (averaged across all trials) as well as a smoothed curve
-# - (2) PSTHs for every probe (averaged across all trials and all cells) as well as a smoothed curve
-# - (3) Smoothed curve for every probe
+# This plots the same thing as "nwb_plots" it drops out p% of neurons (with replacement)
 ##########################################
 
 ## CHANGE ME #############################################################
@@ -17,9 +15,8 @@ from nwb_plots_functions import *
 DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
 SUMMARY_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/'
 VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
-MOUSE_ID = '424448'
+MOUSE_ID = '421338'
 ##########################################################################
-
 
 # Get file from directory
 spikes_nwb_file = os.path.join(DIRECTORY, 'mouse' + MOUSE_ID + '.spikes.nwb')
@@ -36,7 +33,10 @@ DESCRIPTIONS = True
 # Turn this on if it's your first time running this code.
 ALL_PLOTS = True
 
+p = .50
+
 if(ALL_PLOTS):
+    
     for probe_name in probe_names:
         # File to get data from.
         probe_filename = MOUSE_ID + "_" + probe_name
@@ -50,24 +50,19 @@ if(ALL_PLOTS):
         #################################################################################################
         
         ## Find probe to override
-        try:
-            with open(probe_filename, 'rb') as f:
-                probe = pickle.load(f)
-                ## If probe file doesn't exist, then we'll have to make that file from scratch        
-        except FileNotFoundError:
-            
-            for probe_name in probe_names:
-                saveProbeData(MOUSE_ID, probe_name, nwb)
-            
-            print("Run again")
-            sys.exit(1)
+        with open(probe_filename, 'rb') as f:
+            probe = pickle.load(f)
     
         # Summary of all activity across all cells in a probe.
         x = np.zeros((len(bins), 1))
 
         # Plotting (1) #####################
         # Getting all data for a given cell
-        for cell in probe.getCellList():
+
+        # Get random sample of neurons (with replacement) but only (100*p) percent of the original
+        rand_smpl = choices(list(probe.getCellList()), k = int(len(list(probe.getCellList()))*p))
+        
+        for cell in rand_smpl:
             # current cell spiking data
             curr_cell = np.zeros((len(bins), 1))
             for freq in temp_freqs:
@@ -106,22 +101,6 @@ if(ALL_PLOTS):
             
             if(DESCRIPTIONS):
                 print("Cell " + str(cell) + " : " + str(probe.getCell(cell))) 
-                
-            # Plotting
-            if(not PLOTTING):
-                # Plotting normalized cell activity
-                cell_filename  = MOUSE_ID + "_cell" + str(cell)
-                plt.axvline(x=probe.getCell(cell).chg_time, alpha=0.5, linestyle='--', color='magenta')
-                plt.ylim(0, 75)
-                plt.xlim(-20, 520)
-                plt.ylabel('Spikes/second')
-                plt.xlabel('Bins')
-                plt.title("Mouse: " + str(MOUSE_ID) + " / " +  probe_name + " in "+ probe.name + ". Cell: " + str(cell))
-                plt.plot(xs, lsq(xs), color = 'magenta', alpha=0.9) 
-                plt.bar(b[0:len(b)-1], curr_cell)
-                plt.savefig(CELL_PLOTS_DIRECTORY + cell_filename + ".png")
-                plt.clf()    
-            # End Plotting (1) ####################
         
         # Plotting normalized probe activity
         z = fromFreqList(x)
@@ -131,11 +110,11 @@ if(ALL_PLOTS):
         
         ### Normalization
         # also divide by number of neurons in that particular region
-        x /= num_trials*(0.001)*len(probe.getCellList())
+        x /= num_trials*(0.001)*len(rand_smpl)
+
         
         # Need to find the two maxes and two mins
-
-         ################# Finding peaks and valleys #######################
+        ################# Finding peaks and valleys #######################
         # First we find the first peak and the time it occurs at.
         probe.max_frate  = max(x[0:500]) 
         probe.max_ftime  = np.where(x[0:500] == probe.max_frate)[0][0]
@@ -149,6 +128,9 @@ if(ALL_PLOTS):
         probe.max_ftime2 = np.where(x[200:300] == probe.max_frate2)[0][0] + 200
         
         # Last valley
+        if(probe.max_ftime == probe.max_ftime2):
+            probe.max_ftime = 0
+            
         probe.min_frate2 = min(x[probe.max_ftime:probe.max_ftime2])
         probe.min_ftime2 = np.where(x[probe.max_ftime:probe.max_ftime2] == probe.min_frate2)[0][0] + probe.max_ftime
         
@@ -187,16 +169,13 @@ if(ALL_PLOTS):
             plt.title("Mouse: " + str(MOUSE_ID) + " / " +  probe_name + " in "+ probe.name)
             plt.plot(xs, lsq(xs), color = 'red') 
             plt.bar(b[0:len(b)-1], x, alpha=0.8)
-            plt.savefig(PROBE_PLOTS_DIRECTORY + probe_filename + ".png")
+            plt.savefig(PROBE_PLOTS_DIRECTORY + probe_filename + " | " + str((p*100)) + ".png")
             
             plt.clf()
-        
-        with open(probe_filename, 'wb') as f:
-            pickle.dump(probe, f)
         # End Plotting (2) ###########################################
 
         
-
+'''
 # Plotting (3) ###############################################
 # Here, we'll plot all curves for every region for a given mouse.
 probes = []
@@ -229,4 +208,4 @@ plt.legend()
 plt.savefig(SUMMARY_PLOTS_DIRECTORY + str(MOUSE_ID) + ".png")
 plt.clf()
 # End Plotting (3) ###########################################
-
+'''

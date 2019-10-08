@@ -6,16 +6,41 @@ Created on Wed Jun 12 09:25:21 EDT 2019
 @author: Bryan Medina 
 """
 ###### Imports ########
-from scipy.ndimage.filters import gaussian_filter1d
+from random import choices
+from rpy2.robjects.vectors import StrVector
+from rpy2.robjects.vectors import FloatVector
+from scipy.interpolate import LSQUnivariateSpline
+from scipy.interpolate import CubicSpline
+from scipy.interpolate import UnivariateSpline
 
 import h5py as h5
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pickle
+import rpy2.robjects as robjects
+import rpy2.robjects.packages as rpackages
+import sys
 ########################
 
-width = 1
+# Setting up packages for rpy2 use
+package_name = 'cpm'
+
+if rpackages.isinstalled(package_name):
+    have_package = True
+    print("R package %s already installed" % package_name)
+else:
+    have_pakcage = False
+
+if not have_package:
+    utils = rpackages.importr('utils')
+    utils.chooseCRANmirror(ind=1)
+
+    utils.install_packages(package_name)
+    print("installed R package: %s" % package_name)
+
+cpm = rpackages.importr(package_name)
+##################################
 
 ### This is for the 'drifting gratings' stimulus
 # All possible temporal frequencies for the stimulus
@@ -23,9 +48,31 @@ temp_freqs   = [1, 2, 4, 8, 15]
 
 # All possible orientations of stimulus (angles)
 orientations = [i*45 for i in range(8)]
-    
-start   = 0
-end     = 2000
+
+# Knots for spline (selected by eye)
+knots    = [30, 50, 52, 55, 65, 70, 75, 80,  83, 100, 150, 200, 250, 300, 325, 375, 400]
+tr_knots = [50, 110, 160, 200, 250, 300, 350, 400, 450]
+
+# Number of times timulus is presented
+num_trials = 600
+
+# Conversion frmo ms to s
+msToSec    = 1000 # 1000 ms in 1 sec
+
+# For future plotting
+xs = np.linspace(0,600,3000)
+
+# Start and end of trials
+start = 0
+end   = 2000
+
+# Bin width
+width = 1
+
+# Actual bins (for later use)
+bins  = np.linspace(start, end, int( (end - start)/width + 1 ))
+
+# Probe to region mapping
 mapping = {'probeA': 'AM',
         'probeB': 'PM',
         'probeC': 'V1',
@@ -33,15 +80,43 @@ mapping = {'probeA': 'AM',
         'probeE': 'AL',
         'probeF': 'RL'}
 
+colors = ['k', '#9400D3', 'b', 'g', '#FF7F00', 'r']
+
 ###
 
 class Probe:
 
-    ## Set these
-    max_frate = 0
-    max_ftime = 0
-    avg_frate = 0
-    std       = 0
+    # Max firing rate and the time it occurs
+    max_frate  = 0
+    max_ftime  = 0
+
+    # Second highest firing rate
+    max_frate2 = 0
+    max_ftime2 = 0
+
+    # Min firing rate and the time it occurs
+    min_frate  = 0
+    min_ftime  = 0
+
+    # Second lowest 
+    min_frate2 = 0
+    min_ftime2 = 0
+
+    # Average firing rate that is converged to as t -> 500 ms 
+    converge   = 0
+
+    # Change point (before the first peak)
+    change_pt  = 0
+    chg_time   = 0 
+
+    # Average firing rate
+    avg_frate  = 0
+
+    # Standard deviation of the firing rates
+    std        = 0
+
+    # LSQUnivariate function 
+    lsq        = " "
     
     def __init__(self, nwb, name):
         '''
@@ -92,6 +167,32 @@ class Probe:
 
         return self.__cells.keys()
 
+    def __repr__(self):
+        '''
+        Description
+        -----------
+        Method replaces default '__str__' with one that prints out average spiking rate, 2 maximum and 2 minimum firing rates, and the time in which they occur. 
+
+        Output(s)
+        ---------
+        String to print.
+        '''
+
+        return "%s\t Avg: %3.2f Std: %3.2f | Max: %3.2f @ %d | Max2: %3.2f @ %d | Min: %3.2f @ %d | Min2: %3.2f @ %d | Converges to %3.2f | Change: %3.2f @ %d" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2, self.converge, self.change_pt, self.chg_time)
+
+    def __str__(self):
+        '''
+        Description
+        -----------
+        Method replaces default '__repr__' with one that's great for LaTeX-table making.
+
+        Output(s)
+        ---------
+        String to print.
+        '''
+
+        return "%s & %3.2f & %3.2f & (%3.2f, %d) & (%3.2f, %d) & (%3.2f, %d) & (%3.2f, %d) & %3.2f & (%3.2f, %d)\\\\" % (self.name, self.avg_frate, self.std, self.max_frate, self.max_ftime, self.max_frate2, self.max_ftime2, self.min_frate, self.min_ftime, self.min_frate2, self.min_ftime2, self.converge, self.change_pt, self.chg_time)
+
 def getProbeCells(nwb, probe):
     '''
     Description
@@ -124,8 +225,14 @@ def getProbeCells(nwb, probe):
 class Cell:
 
     max_frate = 0
+    max_ftime = 0
     avg_frate = 0
     std       = 0
+    name      = " " 
+    lsq       = " "
+    # Change point (before the first peak)
+    change_pt  = 0
+    chg_time   = 0 
     
     def __init__(self):
         '''
@@ -156,15 +263,71 @@ class Cell:
         return self.__table[config]
 
     def addSpike(self, config, spike, end):
-        # I think this is how it works... But it's the idea
-        # Has to be a little more complicated than this
-        # You need to put it in the right bin
-
+        '''
+        Description
+        -----------
+        Method adds 1 to spike counts
+        
+        Input(s)
+        --------
+        'config': string. key of dictionary.
+        'spike' : time of spike in seconds
+        'end'   : end of trial 
+        
+        Output(s)
+        ---------
+        table at certain config
+        '''
+        # Find out index spike needs to be in.
         bn = insertToBin(spike, end)
-        #print("config: " + (config) + "\t spike: " + str(spike) + "\t bin: " + str(bn))
+        
+        # Add one to ongoing count.
         self.__table[config][bn] += 1
-        #if(self.__table[config][bn] > 1):
-            #print("BIN: " + str(self.__table[config][bn]))
+
+    def __str__(self):
+        '''
+        Description
+        -----------
+        Method replaces default '__str__' with one that prints out average spiking rate, 2 maximum and 2 minimum firing rates, and the time in which they occur. 
+
+        Output(s)
+        ---------
+        String to print.
+        '''
+        return  "Max: %3.2f\t Avg: %3.2f\t Std: %3.2f" % (self.max_frate, self.avg_frate, self.std)
+
+class Trial:
+    # The trial number
+    number = -1
+
+    # The configuration
+    config = ""
+
+    # Should be five values for each of these
+    t      = [None]*5
+    beta   = [None]*5
+
+    # Need to make this go from start to end ... This will hold the PSTH.
+    spikes = np.zeros((len(bins), 1))
+
+    lsq    = []
+
+    def __add__(self, other_trial):
+        '''
+        Description
+        -----------
+        Method overrides '+' operator so that you can add two Trial objects
+
+        Input(s)
+        --------
+        'other_trial': Trial. Another trial object
+        
+        Output(s)
+        ---------
+        sum of two trials (adds spiking histogram)
+        '''
+        pass
+        
 
 def makeTable():
     '''
@@ -177,11 +340,11 @@ def makeTable():
     'table': dict. Dictionary that contains orientation combination as key and all cells that are in V.
     '''
 
-    bins = np.linspace(start, end, int( (end - start)/width + 1 )) 
+    bins  = np.linspace(start, end, int( (end - start)/width + 1 )) 
     
     # In this table, each key is a different configuration of the stimulus
     # and each row corresponds to spikes in a time bin.
-    table        = {}
+    table = {}
 
     for freq in temp_freqs:
         
@@ -189,7 +352,8 @@ def makeTable():
 
             config        = str(freq) + "_" + str(angle) 
             table[config] = np.zeros((len(bins), 1))
-     
+
+    
     return table
 
 def binarySearch(spikes, interval, start, end):
@@ -202,8 +366,8 @@ def binarySearch(spikes, interval, start, end):
     --------
     'spikes'  : list. list of all spikes of a given neuron.
     'interval': list. current time interval of stimulus (usually about 2 seconds).
-    'start'  : int. beginning
-    'end'    : int. end
+    'start'   : int. beginning
+    'end'     : int. end
 
 
     Output(s)
@@ -224,8 +388,8 @@ def binarySearch(spikes, interval, start, end):
 
             next_midpoint = midpoint(start, mid_point-1)
 
-            # If this is true, then we're going to hit a recursion error....
-            # We don't want this.
+            # If this is true, then we're going to hit a recursion error...
+            # We don't want that to happen.
             if mid_point == next_midpoint:
                 return -1
             
@@ -235,7 +399,7 @@ def binarySearch(spikes, interval, start, end):
             
             next_midpoint = midpoint(mid_point+1, end)
             
-            # If this is true, then we're going to hit a recursion error....
+            # If this is true, then we're going to hit a recursion error...
             # We don't want this.            
             if mid_point == next_midpoint:
                 return -1
@@ -317,7 +481,7 @@ def inside(spike, interval):
     return spike >= interval[0] and spike <= interval[1]
 
 
-def midpoint(start, end):
+def midpoint(start_rate, end_rate):
     '''
     Description
     -----------
@@ -325,15 +489,15 @@ def midpoint(start, end):
  
     Input(s)
     --------
-    'start'  : int. beginning
-    'end'    : int. end
+    'start_rate'  : int. beginning
+    'end_rate'    : int. end
 
     Output(s)
     --------
-    int. midpoint between 'start' and 'end'
+    int. midpoint between 'start_rate' and 'end_rate'
     '''
     
-    return int(start + (end - start)/2)
+    return int(start_rate + (end_rate - start_rate)/2)
 
                            
 def insertToBin(spiketime, end):
@@ -419,6 +583,7 @@ def saveProbeData(MOUSE_ID, probe_name, nwb):
             
             # Checking for 'nans'
             if not (str(freq) == "nan") or not (str(angle) == "nan"):
+                
                 freq  = int(freq)
                 angle = int(angle)
                 
@@ -437,7 +602,7 @@ def saveProbeData(MOUSE_ID, probe_name, nwb):
                     
                     # For all the spikes you just found, add them to the their respective bin.
                     for stim_spike in stimulus_spikes:
-                        curr_cell.addSpike(config, stim_spike, end )
+                        curr_cell.addSpike(config, stim_spike, end)
                         
     print("Saving to " + filename)
     
@@ -449,11 +614,11 @@ def fromFreqList(x):
     '''
     Description
     -----------
-    'fromFreqList' converts frequency list to a list of repitions based on index
+    'fromFreqList' converts frequency list to a list of repitions based on index. This is usefull for histograms.
 
     Example
     -------
-    fromFreqList([1,2,3,4]) => [0, 1, 1, 2, 2, 2, 3, 3, 3, 3]
+    fromFreqList([2,1,4,2]) => [0,0,1,2,2,2,2,3,3]
  
     Input(s)
     --------
@@ -470,3 +635,24 @@ def fromFreqList(x):
             z.append(num)
 
     return z
+
+def robj_to_dict(robj):
+    '''
+    Description
+    -----------
+    'robj_to_dict' converts an R object to a python dictionary
+ 
+    Input(s)
+    --------
+    'robj': R object 
+
+    Output(s)
+    --------
+    dictionary.
+
+    Source
+    ------
+    https://medium.com/bigdatarepublic/contextual-changepoint-detection-with-python-and-r-using-rpy2-fa7d86259ba9
+    
+    '''    
+    return dict(zip(robj.names, map(list, robj)))
