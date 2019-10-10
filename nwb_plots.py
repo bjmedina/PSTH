@@ -14,10 +14,10 @@ from nwb_plots_functions import *
 
 ## CHANGE ME #############################################################
 # Data directory
-DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
-SUMMARY_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/'
-VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
-MOUSE_ID = '424448'
+DIRECTORY = '/home/bjm/Documents/CS/PSTH'
+SUMMARY_PLOTS_DIRECTORY = '/home/bjm/Documents/CS/PSTH/plots/'
+VAR_DIREC = '/home/bjm/Documents/CS/PSTH/plots/variations/'
+MOUSE_ID = '421338'
 ##########################################################################
 
 
@@ -45,8 +45,8 @@ if(ALL_PLOTS):
         # plot directories
         
         ## CHANGE ME ####################################################################################
-        PROBE_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/probes/'
-        CELL_PLOTS_DIRECTORY  = '/Users/bjm/Documents/CMU/Research/data/plots/cells/' + probe_name + '/'
+        PROBE_PLOTS_DIRECTORY = '/home/bjm/Documents/CS/PSTH/plots/probes/'
+        CELL_PLOTS_DIRECTORY  = '/home/bjm/Documents/CS/PSTH/plots/cells/' + probe_name + '/'
         #################################################################################################
         
         ## Find probe to override
@@ -108,7 +108,7 @@ if(ALL_PLOTS):
                 print("Cell " + str(cell) + " : " + str(probe.getCell(cell))) 
                 
             # Plotting
-            if(not PLOTTING):
+            if(PLOTTING):
                 # Plotting normalized cell activity
                 cell_filename  = MOUSE_ID + "_cell" + str(cell)
                 plt.axvline(x=probe.getCell(cell).chg_time, alpha=0.5, linestyle='--', color='magenta')

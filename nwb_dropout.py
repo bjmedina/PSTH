@@ -12,9 +12,9 @@ from nwb_plots_functions import *
 
 ## CHANGE ME #############################################################
 # Data directory
-DIRECTORY = '/Users/bjm/Documents/CMU/Research/data'
-SUMMARY_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/'
-VAR_DIREC = '/Users/bjm/Documents/CMU/Research/data/plots/variations/'
+DIRECTORY = '/home/bjm/Documents/CS/PSTH'
+SUMMARY_PLOTS_DIRECTORY = '/home/bjm/Documents/CS/PSTH/plots/'
+VAR_DIREC = '/home/bjm/Documents/CS/PSTH/plots/variations/'
 MOUSE_ID = '421338'
 ##########################################################################
 
@@ -33,6 +33,7 @@ DESCRIPTIONS = True
 # Turn this on if it's your first time running this code.
 ALL_PLOTS = True
 
+# Percent neurons being dropped out
 p = .50
 
 if(ALL_PLOTS):
@@ -45,8 +46,8 @@ if(ALL_PLOTS):
         # plot directories
         
         ## CHANGE ME ####################################################################################
-        PROBE_PLOTS_DIRECTORY = '/Users/bjm/Documents/CMU/Research/data/plots/probes/'
-        CELL_PLOTS_DIRECTORY  = '/Users/bjm/Documents/CMU/Research/data/plots/cells/' + probe_name + '/'
+        PROBE_PLOTS_DIRECTORY = '/home/bjm/Documents/CS/PSTH/plots/probes/'
+        CELL_PLOTS_DIRECTORY  = '/home/bjm/Documents/CS/PSTH/plots/cells/' + probe_name + '/'
         #################################################################################################
         
         ## Find probe to override
